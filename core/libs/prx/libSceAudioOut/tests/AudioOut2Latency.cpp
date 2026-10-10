@@ -8,6 +8,7 @@
 extern "C" {
 int APS5_VABI sceAudioOut2Initialize();
 int APS5_VABI sceAudioOut2Set3DLatency(int, std::uint32_t);
+int APS5_VABI sceAudioOut2EnableChat();
 int APS5_VABI sceAudioOut2MasteringInit(std::uint32_t);
 int APS5_VABI sceAudioOut2MasteringTerm();
 int APS5_VABI sceAudioOut2MasteringSetParam(const void*, std::uint32_t, std::uint32_t);
@@ -43,6 +44,10 @@ void TestSet3DLatency() {
     Require(ThrowsRuntimeError([] { sceAudioOut2Set3DLatency(user, 2); }), "a user other than the system user must throw");
 }
 
+void TestEnableChat() {
+    Require(ThrowsRuntimeError([] { sceAudioOut2EnableChat(); }), "enabling chat must throw");
+}
+
 void TestMasteringInit() {
     Require(sceAudioOut2MasteringInit(0) == 0, "flags 0 must be accepted");
     Require(ThrowsRuntimeError([] { sceAudioOut2MasteringInit(1); }), "flags 1 must throw");
@@ -65,6 +70,7 @@ void TestMasteringSetParam() {
 int main() {
     Require(sceAudioOut2Initialize() == 0, "initialization must succeed");
     TestSet3DLatency();
+    TestEnableChat();
     TestMasteringInit();
     TestMasteringTerm();
     TestMasteringSetParam();
