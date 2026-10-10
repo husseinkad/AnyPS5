@@ -28,7 +28,7 @@
 #include <string>
 #include <vector>
 
-int main(const int argc, char* argv[]) {
+int RunRelinker(const int argc, char* argv[]) {
     Cli::Args args;
     try {
         args = Cli::ParseArgs(argc, argv);
@@ -174,3 +174,26 @@ int main(const int argc, char* argv[]) {
 
     return 0;
 }
+
+#ifdef _WIN32
+int wmain(const int argc, wchar_t* argv[]) {
+    std::vector<std::string> arguments;
+    try {
+        for (int index = 0; index < argc; ++index) {
+            const auto encoded = std::filesystem::path(argv[index]).u8string();
+            arguments.emplace_back(encoded.begin(), encoded.end());
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "FAIL: command line is not valid UTF-16: " << e.what() << "\n";
+        return 1;
+    }
+    std::vector<char*> pointers;
+    for (auto& argument : arguments) pointers.push_back(argument.data());
+    pointers.push_back(nullptr);
+    return RunRelinker(argc, pointers.data());
+}
+#else
+int main(const int argc, char* argv[]) {
+    return RunRelinker(argc, argv);
+}
+#endif

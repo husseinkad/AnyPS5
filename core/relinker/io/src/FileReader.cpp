@@ -9,7 +9,7 @@ std::vector<std::uint8_t> FileReader::Read(const std::string& path) {
     std::error_code error;
     if (!std::filesystem::is_regular_file(path, error))
         throw Domain::RelinkerException("Cannot open file: " + path);
-    std::ifstream f(path, std::ios::binary | std::ios::ate);
+    std::ifstream f(std::filesystem::path(path), std::ios::binary | std::ios::ate);
     if (!f)
         throw Domain::RelinkerException("Cannot open file: " + path);
     const std::streamsize size = f.tellg();
