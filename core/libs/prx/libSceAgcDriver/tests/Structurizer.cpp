@@ -249,6 +249,14 @@ int main() {
                 return 1;
             }
         }
+        auto twoLatches = makeGraph({{1}, {2, 4}, {3, 4}, {4, 5}, {1, 6}, {1}, {}});
+        Structurizer{}.Structurize(twoLatches);
+        requireExactPostDominators(twoLatches, "nested selections that share a join with two loop latches");
+        requireStructuredBranches(twoLatches, "nested selections that share a join with two loop latches");
+        auto deeperLatches = makeGraph({{1}, {2, 5}, {3, 5}, {4, 5}, {5, 6}, {1, 7}, {1}, {}});
+        Structurizer{}.Structurize(deeperLatches);
+        requireExactPostDominators(deeperLatches, "four nested selections that share a join with two loop latches");
+        requireStructuredBranches(deeperLatches, "four nested selections that share a join with two loop latches");
         std::vector<std::vector<std::uint32_t>> diamonds;
         for (std::uint32_t diamond = 0; diamond < 50u; ++diamond) {
             const auto head = diamond * 3u;

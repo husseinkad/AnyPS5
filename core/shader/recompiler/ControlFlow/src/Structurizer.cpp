@@ -280,6 +280,33 @@ bool reachesWithinIteration(const ControlFlowGraph& graph, const NaturalLoop& lo
     return false;
 }
 
+std::vector<bool> reachedWithinIteration(const ControlFlowGraph& graph, const NaturalLoop& loop, const std::vector<std::uint32_t>& starts, std::uint32_t stop) {
+    std::vector<std::uint32_t> pending = starts;
+    std::vector<bool> reached(graph.blocks.size(), false);
+    while (!pending.empty()) {
+        const auto blockId = pending.back();
+        pending.pop_back();
+        if (blockId == stop || blockId == loop.continueBlock || blockId == loop.mergeBlock || reached[blockId]) {
+            continue;
+        }
+        reached[blockId] = true;
+        const auto& block = graph.FindBlock(blockId);
+        pending.insert(pending.end(), block.successors.begin(), block.successors.end());
+    }
+    return reached;
+}
+
+bool closesSelectionAt(const ControlFlowGraph& graph, const NaturalLoop& loop, const BasicBlock& header, std::uint32_t join) {
+    const auto arms = reachedWithinIteration(graph, loop, {header.terminator.trueBlock, header.terminator.falseBlock}, join);
+    const auto after = reachedWithinIteration(graph, loop, {join}, InvalidControlFlowId);
+    for (std::size_t blockId = 0; blockId < arms.size(); ++blockId) {
+        if (arms[blockId] && after[blockId]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 std::vector<std::uint32_t> linearTail(const ControlFlowGraph& graph, std::uint32_t start) {
     std::vector<std::uint32_t> tail;
     for (auto blockId = start; !contains(tail, blockId);) {
@@ -448,6 +475,17 @@ std::uint32_t findSelectionMerge(const ControlFlowGraph& graph, const BasicBlock
         const bool falseJoins = reachesWithinIteration(graph, *loop, falseTarget, globalMerge);
         if (trueJoins != falseJoins) {
             return trueJoins ? trueTarget : falseTarget;
+        }
+        if (!graph.Dominates(block.id, globalMerge)) {
+            const auto armReachesJoin = [&](std::uint32_t join, std::uint32_t other) {
+                return join != other && isInsideLoopConstruct(graph, *loop, join) && graph.Dominates(block.id, join) && reachesWithinIteration(graph, *loop, other, join) && closesSelectionAt(graph, *loop, block, join);
+            };
+            if (armReachesJoin(trueTarget, falseTarget)) {
+                return trueTarget;
+            }
+            if (armReachesJoin(falseTarget, trueTarget)) {
+                return falseTarget;
+            }
         }
     }
     return globalMerge;
