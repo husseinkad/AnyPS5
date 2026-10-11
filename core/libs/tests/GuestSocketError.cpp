@@ -1,6 +1,7 @@
 #include "prx/libkernel/Socket/include/SocketError.hpp"
 #include <cstdio>
 #include <cstdlib>
+#include <initializer_list>
 
 struct ErrorCase {
     const char* name;
@@ -108,6 +109,12 @@ int main() {
     if (GuestSockets::GuestErrorFromHost(UnmappedHost) != 5) {
         std::fprintf(stderr, "a host error with no FreeBSD socket counterpart is not EIO\n");
         ++failures;
+    }
+    for (const int host : {0, -1}) {
+        if (GuestSockets::GuestErrorFromHost(host) != 5) {
+            std::fprintf(stderr, "host error %d is not EIO\n", host);
+            ++failures;
+        }
     }
 #ifdef _WIN32
     if (GuestSockets::GuestErrorFromHost(ShutdownHost) != 32) {
