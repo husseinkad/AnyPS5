@@ -193,8 +193,11 @@ static void CheckIntegerConversions() {
         {"0xg", 16, 0, 1, 0},
         {"0x", 16, 0, 1, 0},
         {"z!", 36, 35, 1, 0},
-        {"", 10, 0, 0, 0},
-        {" \t+!", 10, 0, 0, 0},
+        {"", 10, 0, 0, 22},
+        {" \t+!", 10, 0, 0, 22},
+        {"z!", 10, 0, 0, 22},
+        {"7", 1, 0, 0, 22},
+        {"7", 37, 0, 0, 22},
         {"123!", 10, 123, 3, 0}
     };
     for (const auto& test : signedCases) {
@@ -209,6 +212,11 @@ static void CheckIntegerConversions() {
         const auto maxValue = strtoimax_nid_postfix(test.text, &end, test.base);
         if (maxValue != test.value || end != test.text + test.consumed || *__error_nid_postfix() != test.error) {
             std::fprintf(stderr, "Guest strtoimax failed for '%s' in base %d\n", test.text, test.base);
+            std::abort();
+        }
+        *__error_nid_postfix() = 0;
+        if (strtoll_nid_postfix(test.text, &end, test.base) != test.value || end != test.text + test.consumed || *__error_nid_postfix() != test.error) {
+            std::fprintf(stderr, "Guest strtoll failed for '%s' in base %d\n", test.text, test.base);
             std::abort();
         }
     }
@@ -240,8 +248,11 @@ static void CheckIntegerConversions() {
         {" +0Xg!", 0, 0, 3, 0},
         {"0x!", 16, 0, 1, 0},
         {"z!", 36, 35, 1, 0},
-        {"", 10, 0, 0, 0},
-        {" \t-!", 10, 0, 0, 0},
+        {"", 10, 0, 0, 22},
+        {" \t-!", 10, 0, 0, 22},
+        {"z!", 10, 0, 0, 22},
+        {"7", 1, 0, 0, 22},
+        {"7", 37, 0, 0, 22},
         {"123!", 10, 123, 3, 0}
     };
     for (const auto& test : unsignedCases) {
@@ -250,6 +261,21 @@ static void CheckIntegerConversions() {
         const auto value = strtoul_nid_postfix(test.text, &end, test.base);
         if (value != test.value || end != test.text + test.consumed || *__error_nid_postfix() != test.error) {
             std::fprintf(stderr, "Guest strtoul failed for '%s' in base %d\n", test.text, test.base);
+            std::abort();
+        }
+        *__error_nid_postfix() = 0;
+        if (strtoull_nid_postfix(test.text, &end, test.base) != test.value || end != test.text + test.consumed || *__error_nid_postfix() != test.error) {
+            std::fprintf(stderr, "Guest strtoull failed for '%s' in base %d\n", test.text, test.base);
+            std::abort();
+        }
+        *__error_nid_postfix() = 0;
+        if (strtoumax_nid_postfix(test.text, &end, test.base) != test.value || end != test.text + test.consumed || *__error_nid_postfix() != test.error) {
+            std::fprintf(stderr, "Guest strtoumax failed for '%s' in base %d\n", test.text, test.base);
+            std::abort();
+        }
+        *__error_nid_postfix() = 0;
+        if (_Stoul_nid_postfix(test.text, &end, test.base) != test.value || end != test.text + test.consumed || *__error_nid_postfix() != test.error) {
+            std::fprintf(stderr, "Guest _Stoul failed for '%s' in base %d\n", test.text, test.base);
             std::abort();
         }
     }

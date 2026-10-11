@@ -70,8 +70,8 @@ static void CheckStoul() {
     CheckStoul(u"0b1", 0, 0, 1, 0, "no binary prefix");
     CheckStoul(u"0xg", 16, 0, 1, 0, "prefix without digits");
     CheckStoul(u"12é3", 10, 12, 2, 0, "stops at a non-ASCII unit");
-    CheckStoul(u"　5", 10, 0, 0, 0, "non-ASCII space is not skipped");
-    CheckStoul(u"", 10, 0, 0, 0, "empty string");
+    CheckStoul(u"　5", 10, 0, 0, EINVAL, "non-ASCII space is not skipped");
+    CheckStoul(u"", 10, 0, 0, EINVAL, "empty string");
     Require(_WStoul_nid_postfix(u"9", nullptr, 10) == 9, "_WStoul accepts a null end pointer");
     Require(Throws([] { _WStoul_nid_postfix(u"1", nullptr, 1); }), "_WStoul throws for base 1");
     Require(Throws([] { _WStoul_nid_postfix(u"1", nullptr, 37); }), "_WStoul throws for base 37");

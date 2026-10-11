@@ -96,13 +96,11 @@ unsigned int APS5_VABI _Atomic_load_4_nid_postfix(volatile unsigned int* target,
 }
 
 std::intmax_t APS5_VABI strtoimax_nid_postfix(const char* str, char** endptr, int base) {
-    if (StopAtPrefixLetter_nid_no_patch(str, endptr, base)) return 0;
-    return std::strtoimax(str, endptr, base);
+    return ParseGuestInteger(str, endptr, base, [](const char* text, char** end, int radix) { return std::strtoimax(text, end, radix); });
 }
 
 std::uintmax_t APS5_VABI strtoumax_nid_postfix(const char* str, char** endptr, int base) {
-    if (StopAtPrefixLetter_nid_no_patch(str, endptr, base)) return 0;
-    return std::strtoumax(str, endptr, base);
+    return ParseGuestInteger(str, endptr, base, [](const char* text, char** end, int radix) { return std::strtoumax(text, end, radix); });
 }
 
 unsigned int APS5_VABI _ZSt14_Random_devicev_nid_postfix() {
@@ -143,8 +141,7 @@ void APS5_VABI funlockfile_nid_postfix(FileStream* stream) {
 }
 
 std::uint64_t APS5_VABI _Stoul_nid_postfix(const char* str, char** endptr, int base) {
-    if (StopAtPrefixLetter_nid_no_patch(str, endptr, base)) return 0;
-    return std::strtoull(str, endptr, base);
+    return ParseGuestInteger(str, endptr, base, [](const char* text, char** end, int radix) { return static_cast<std::uint64_t>(std::strtoull(text, end, radix)); });
 }
 
 void APS5_VABI _Locksyslock_nid_postfix() {

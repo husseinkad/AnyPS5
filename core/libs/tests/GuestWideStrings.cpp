@@ -5,6 +5,7 @@
 #include <initializer_list>
 
 extern "C" {
+int* APS5_VABI __error_nid_postfix();
 const char16_t* APS5_VABI wmemchr_nid_postfix(const char16_t* s, char16_t c, std::size_t n);
 int APS5_VABI wmemcmp_nid_postfix(const char16_t* s1, const char16_t* s2, std::size_t n);
 char16_t* APS5_VABI wmemcpy_nid_postfix(char16_t* dest, const char16_t* src, std::size_t n);
@@ -126,6 +127,17 @@ int main() {
     require(wcstoull_nid_postfix(u"18446744073709551615", nullptr, 10) == ULLONG_MAX);
     const char16_t* letters = u"abc";
     require(wcstol_nid_postfix(letters, &end, 10) == 0 && end == letters);
+    for (const int expected : {22, 0}) {
+        const char16_t* text = expected == 0 ? u"7" : u"abc";
+        *__error_nid_postfix() = 0;
+        require(wcstol_nid_postfix(text, &end, 10) == (expected == 0 ? 7 : 0) && *__error_nid_postfix() == expected);
+        *__error_nid_postfix() = 0;
+        require(wcstoll_nid_postfix(text, &end, 10) == (expected == 0 ? 7 : 0) && *__error_nid_postfix() == expected);
+        *__error_nid_postfix() = 0;
+        require(wcstoul_nid_postfix(text, &end, 10) == (expected == 0 ? 7u : 0u) && *__error_nid_postfix() == expected);
+        *__error_nid_postfix() = 0;
+        require(wcstoull_nid_postfix(text, &end, 10) == (expected == 0 ? 7u : 0u) && *__error_nid_postfix() == expected);
+    }
     const char16_t* binary = u" -0b101";
     for (const int base : {0, 2}) {
         require(wcstol_nid_postfix(binary, &end, base) == 0 && end == binary + 3);
