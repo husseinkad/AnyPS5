@@ -202,6 +202,30 @@ int main() {
 #endif
         std::filesystem::remove_all(area);
     }
+    {
+        const auto area = root / "kernel_rename";
+        const auto sourceFile = area / "source.txt";
+        const auto sourceDirectory = area / "source_directory";
+        const auto fullDirectory = area / "full_directory";
+        Require(std::filesystem::create_directories(sourceDirectory / "child"));
+        Require(std::filesystem::create_directories(fullDirectory));
+        { std::ofstream stream(sourceFile); stream << "source"; }
+        { std::ofstream stream(fullDirectory / "entry"); stream << "entry"; }
+        const auto name = [](const std::filesystem::path& path) { return path.string(); };
+        const auto sceError = [](unsigned errnoValue) { return static_cast<int>(0x80020000u | errnoValue); };
+        Require(sceKernelRename(name(sourceFile).c_str(), name(area / "absent" / "target").c_str()) == sceError(2));
+        Require(sceKernelRename(name(sourceFile).c_str(), name(sourceFile / "target").c_str()) == sceError(20));
+        Require(sceKernelRename(name(sourceFile).c_str(), name(fullDirectory).c_str()) == sceError(21));
+        Require(sceKernelRename(name(sourceDirectory).c_str(), name(sourceFile).c_str()) == sceError(20));
+        Require(sceKernelRename(name(sourceDirectory).c_str(), name(fullDirectory).c_str()) == sceError(66));
+        Require(sceKernelRename(name(sourceDirectory).c_str(), name(sourceDirectory / "child" / "moved").c_str()) == sceError(22));
+        Require(sceKernelRename(name(sourceDirectory).c_str(), name(sourceDirectory / "child").c_str()) == sceError(22));
+        Require(std::filesystem::is_regular_file(sourceFile) && std::filesystem::is_directory(sourceDirectory / "child"));
+        Require(std::filesystem::is_regular_file(fullDirectory / "entry"));
+        Require(sceKernelRename(name(sourceFile).c_str(), name(area / "moved.txt").c_str()) == 0);
+        Require(!std::filesystem::exists(sourceFile) && std::filesystem::is_regular_file(area / "moved.txt"));
+        std::filesystem::remove_all(area);
+    }
     Require(remove_nid_postfix(file.string().c_str()) == 0);
     Require(!std::filesystem::exists(file));
     Require(remove_nid_postfix(file.string().c_str()) == -1 && *__error_nid_postfix() == 2);

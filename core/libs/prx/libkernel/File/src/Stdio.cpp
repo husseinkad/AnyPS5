@@ -998,6 +998,42 @@ int64_t APS5_VABI pwritev_nid_postfix(int d, const KernelIovec* iov, int iovcnt,
     return result < 0 ? PosixFailure(static_cast<int>(result) & 0xffff) : result;
 }
 
+#ifdef _WIN32
+static bool IsInsideDirectory(const std::filesystem::path& directory, const std::filesystem::path& entry) {
+    std::error_code error;
+    for (auto ancestor = WithoutTrailingSeparator(entry).parent_path(); ancestor.has_relative_path(); ancestor = ancestor.parent_path()) {
+        if (std::filesystem::equivalent(ancestor, directory, error)) return true;
+    }
+    return false;
+}
+
+static int WindowsRenameFailure(const std::filesystem::path& source, const std::filesystem::path& destination) {
+    std::error_code error;
+    if (!std::filesystem::is_directory(WithoutTrailingSeparator(destination).parent_path(), error)) {
+        return HasNonDirectoryPrefix(destination) ? SCE_KERNEL_ERROR_ENOTDIR : SCE_KERNEL_ERROR_ENOENT;
+    }
+    if (!std::filesystem::is_directory(source, error)) return SCE_KERNEL_ERROR_EIO;
+    if (IsInsideDirectory(source, destination)) return SCE_KERNEL_ERROR_EINVAL;
+    if (std::filesystem::is_directory(destination, error) && !std::filesystem::is_empty(destination, error)) return SCE_KERNEL_ERROR_ENOTEMPTY;
+    return SCE_KERNEL_ERROR_EIO;
+}
+#endif
+
+static int RenameFailure(const std::filesystem::path& source, const std::filesystem::path& destination, const std::error_code& error) {
+    if (error == std::errc::no_such_file_or_directory) return SCE_KERNEL_ERROR_ENOENT;
+    if (error == std::errc::not_a_directory) return SCE_KERNEL_ERROR_ENOTDIR;
+    if (error == std::errc::is_a_directory) return SCE_KERNEL_ERROR_EISDIR;
+    if (error == std::errc::directory_not_empty) return SCE_KERNEL_ERROR_ENOTEMPTY;
+    if (error == std::errc::invalid_argument) return SCE_KERNEL_ERROR_EINVAL;
+#ifdef _WIN32
+    if (error == std::errc::io_error || error == std::errc::permission_denied) return WindowsRenameFailure(source, destination);
+#else
+    static_cast<void>(source);
+    static_cast<void>(destination);
+#endif
+    return SCE_KERNEL_ERROR_EIO;
+}
+
 int APS5_VABI sceKernelRename(const char* from, const char* to) {
     if (from == nullptr || to == nullptr) throw std::invalid_argument("sceKernelRename: path is null");
     if (*from == '\0' || *to == '\0') return SceErrorFromErrno(GUEST_ENOENT);
@@ -1006,7 +1042,7 @@ int APS5_VABI sceKernelRename(const char* from, const char* to) {
     if (!std::filesystem::exists(source, error)) return SceErrorFromErrno(GUEST_ENOENT);
     const auto destination = ResolvePath_nid_no_patch(to);
     std::filesystem::rename(source, destination, error);
-    if (error) return SceErrorFromErrno(GUEST_EIO);
+    if (error) return RenameFailure(source, destination, error);
     RecordWrittenPath_nid_no_patch(source);
     RecordWrittenPath_nid_no_patch(destination);
     return 0;
