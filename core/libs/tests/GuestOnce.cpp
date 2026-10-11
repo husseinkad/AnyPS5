@@ -16,6 +16,7 @@ int APS5_VABI scePthreadOnce(std::int32_t*, Initializer);
 int APS5_VABI scePthreadCreate(Pthread*, const PthreadAttr*, PthreadEntry, void*, const char*);
 int APS5_VABI scePthreadJoin(Pthread, void**);
 void APS5_VABI scePthreadExit(void*);
+void APS5_VABI __pthread_cleanup_push_imp_nid_postfix(void (APS5_VABI*)(void*), void*, void*);
 }
 static constexpr int SCE_KERNEL_ERROR_EINVAL = static_cast<int>(0x80020016);
 static void Require(bool value) { if (!value) std::abort(); }
@@ -31,6 +32,12 @@ static void APS5_VABI Initialize() {
 }
 static void APS5_VABI Retry() {
     if (++attempts == 1) throw 7;
+}
+static void APS5_VABI IgnoreCleanup(void*) { std::abort(); }
+static void APS5_VABI PushAndThrow() {
+    std::uintptr_t info[8];
+    __pthread_cleanup_push_imp_nid_postfix(IgnoreCleanup, nullptr, info);
+    throw 7;
 }
 static void APS5_VABI ExitThread() { scePthreadExit(nullptr); }
 static void APS5_VABI Count() { ++attempts; }
@@ -71,6 +78,11 @@ int main() {
     static GuestOnce posixExit{}, sceExit{}, sceRetry{};
     CheckExitInsideInitializer(PosixExitCaller, posixExit);
     CheckExitInsideInitializer(SceExitCaller, sceExit);
+    static GuestOnce pushed{};
+    try { pthread_once_nid_postfix(&pushed, PushAndThrow); std::abort(); }
+    catch (int value) { Require(value == 7 && pushed.state == 0); }
+    attempts = 0;
+    Require(pthread_once_nid_postfix(&pushed, Count) == 0 && attempts == 1 && pushed.state == 1);
     attempts = 0;
     try { scePthreadOnce(&sceRetry.state, Retry); std::abort(); }
     catch (int value) { Require(value == 7 && sceRetry.state == 0); }

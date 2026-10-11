@@ -359,6 +359,14 @@ void ThreadCancel::Check() {
     if (Requested()) scePthreadExit(GUEST_CANCELED);
 }
 
+void* ThreadCancel::CleanupMark() {
+    return CurrentGuestState().cleanupHandlers;
+}
+
+void ThreadCancel::CleanupRestore(void* mark) {
+    CurrentGuestState().cleanupHandlers = static_cast<CleanupHandler*>(mark);
+}
+
 void ThreadCancel::BeginWait(TimedWait::Condition* condition) {
     if (!CurrentGuestState().current) return;
     std::lock_guard lock(CurrentGuestState().current->cancelLock);

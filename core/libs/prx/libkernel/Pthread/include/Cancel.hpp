@@ -21,6 +21,8 @@ namespace ThreadCancel {
 
 bool Requested();
 void Check();
+void* CleanupMark();
+void CleanupRestore(void* mark);
 void BeginWait(TimedWait::Condition* condition);
 void EndWait();
 
