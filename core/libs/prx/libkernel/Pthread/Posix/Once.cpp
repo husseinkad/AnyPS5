@@ -1,5 +1,7 @@
 #include "prx/libc/include/General.hpp"
 #include "prx/libc/include/general/VabiMacros.hpp"
+#include "prx/libkernel/KernelErrors.hpp"
+#include "../include/Cancel.hpp"
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
@@ -14,6 +16,14 @@ struct GuestOnce {
 static_assert(offsetof(GuestOnce, mutex) == 8 && sizeof(GuestOnce) == 16);
 std::mutex onceMutex;
 std::condition_variable onceChanged;
+
+void APS5_VABI AbandonOnce(void* argument) {
+    {
+        std::lock_guard lock(onceMutex);
+        static_cast<GuestOnce*>(argument)->state = 0;
+    }
+    onceChanged.notify_all();
+}
 }
 
 extern "C" int APS5_VABI pthread_once_nid_postfix(
@@ -27,18 +37,22 @@ extern "C" int APS5_VABI pthread_once_nid_postfix(
     lock.unlock();
     // Initializers may initialize other once controls. Never run guest code
     // under the shared lock. The lock publishes all initializer writes.
+    std::uintptr_t cleanup[8];
+    __pthread_cleanup_push_imp_nid_postfix(AbandonOnce, control, cleanup);
     try {
         initialize();
     } catch (...) {
-        lock.lock();
-        control->state = 0;
-        lock.unlock();
-        onceChanged.notify_all();
+        __pthread_cleanup_pop_imp_nid_postfix(1);
         throw;
     }
+    __pthread_cleanup_pop_imp_nid_postfix(0);
     lock.lock();
     control->state = 1;
     lock.unlock();
     onceChanged.notify_all();
     return 0;
+}
+
+extern "C" int APS5_VABI scePthreadOnce(std::int32_t* once, void (APS5_VABI *initialize)()) {
+    return pthread_once_nid_postfix(reinterpret_cast<GuestOnce*>(once), initialize) == 0 ? 0 : SCE_KERNEL_ERROR_EINVAL;
 }

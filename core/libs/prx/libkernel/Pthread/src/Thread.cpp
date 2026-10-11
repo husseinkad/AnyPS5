@@ -802,23 +802,6 @@ int APS5_VABI scePthreadSetprio(Pthread thread, int prio) {
     return SCE_OK;
 }
 
-int APS5_VABI scePthreadOnce(int32_t* once, void (APS5_VABI* init)(void)) {
-    if (!once || !init) return SCE_KERNEL_ERROR_EINVAL;
-    constexpr int32_t Never = 0;
-    constexpr int32_t Done = 1;
-    constexpr int32_t Running = 2;
-    std::atomic_ref<int32_t> state(*once);
-    int32_t expected = Never;
-    if (state.compare_exchange_strong(expected, Running, std::memory_order_acq_rel)) {
-        init();
-        state.store(Done, std::memory_order_release);
-        state.notify_all();
-        return SCE_OK;
-    }
-    while ((expected = state.load(std::memory_order_acquire)) == Running) state.wait(Running, std::memory_order_acquire);
-    return SCE_OK;
-}
-
 }
 
 extern "C" {
