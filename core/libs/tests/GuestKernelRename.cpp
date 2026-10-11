@@ -81,6 +81,34 @@ int main() {
     Require(std::filesystem::exists(renamed) && std::filesystem::is_directory(directory) && std::filesystem::exists(fullDirectory / "entry.txt"));
     Require(kernelRename(renamed.string().c_str(), file.string().c_str()) == 0);
     Require(std::filesystem::exists(file) && !std::filesystem::exists(renamed));
+    const auto slashSource = root / "slash_source";
+    const auto slashTarget = root / "slash_target";
+    Require(std::filesystem::create_directory(slashSource));
+    Require(kernelRename((slashSource.string() + "/").c_str(), (slashTarget.string() + "/").c_str()) == 0);
+    Require(!std::filesystem::exists(slashSource) && std::filesystem::is_directory(slashTarget));
+    Require(kernelRename(slashTarget.string().c_str(), (slashSource.string() + "/").c_str()) == 0);
+    Require(kernelRename((slashSource.string() + "/").c_str(), slashTarget.string().c_str()) == 0);
+    Require(rename_nid_postfix(slashTarget.string().c_str(), (slashSource.string() + "/").c_str()) == 0);
+    Require(std::filesystem::is_directory(slashSource) && !std::filesystem::exists(slashTarget));
+    Require(kernelRename((file.string() + "/").c_str(), slashTarget.string().c_str()) == Enotdir);
+    Require(kernelRename(file.string().c_str(), (slashTarget.string() + "/").c_str()) == Enotdir);
+    Require(std::filesystem::is_regular_file(file));
+#ifdef _WIN32
+    const auto emptyTarget = root / "empty_target";
+    const auto lockedSource = root / "locked_source";
+    Require(std::filesystem::create_directory(emptyTarget) && std::filesystem::create_directory(lockedSource));
+    { std::ofstream stream(lockedSource / "child.txt"); stream << "child"; }
+    const HANDLE child = CreateFileW((lockedSource / "child.txt").c_str(), GENERIC_READ, FILE_SHARE_READ,
+        nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    Require(child != INVALID_HANDLE_VALUE);
+    Require(kernelRename(lockedSource.string().c_str(), emptyTarget.string().c_str()) != 0);
+    Require(std::filesystem::is_directory(emptyTarget) && std::filesystem::is_directory(lockedSource));
+    Require(rename_nid_postfix(lockedSource.string().c_str(), emptyTarget.string().c_str()) == -1);
+    Require(std::filesystem::is_directory(emptyTarget) && std::filesystem::is_directory(lockedSource));
+    CloseHandle(child);
+    Require(kernelRename(lockedSource.string().c_str(), emptyTarget.string().c_str()) == 0);
+    Require(std::filesystem::exists(emptyTarget / "child.txt") && !std::filesystem::exists(lockedSource));
+#endif
     std::filesystem::remove_all(root);
     return 0;
 }

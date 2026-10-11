@@ -2,21 +2,32 @@
 #include "prx/libc/include/General.hpp"
 #include "prx/libc/include/Rename.hpp"
 #include <cerrno>
+#include <chrono>
 #include <filesystem>
 #include <new>
+#include <stdexcept>
+#include <string>
 
-int RenamePath_nid_no_patch(const std::filesystem::path& source, const std::filesystem::path& destination) {
+static std::filesystem::path WithoutTrailingSeparator(const std::filesystem::path& path) {
+    return path.has_relative_path() && !path.has_filename() ? path.parent_path() : path;
+}
+
+int RenamePath_nid_no_patch(const std::filesystem::path& sourcePath, const std::filesystem::path& destinationPath) {
     constexpr int GuestEnoent = 2;
-    constexpr int GuestEio = 5;
     constexpr int GuestEnotdir = 20;
     constexpr int GuestEisdir = 21;
     constexpr int GuestEinval = 22;
     constexpr int GuestEnotempty = 66;
     namespace fs = std::filesystem;
+    const auto source = WithoutTrailingSeparator(sourcePath);
+    const auto destination = WithoutTrailingSeparator(destinationPath);
+    const bool sourceNeedsDirectory = source != sourcePath;
+    const bool destinationNeedsDirectory = destination != destinationPath;
     std::error_code error;
     const auto sourceStatus = fs::symlink_status(source, error);
     if (error && error != std::errc::no_such_file_or_directory) return FilesystemError(error);
     if (sourceStatus.type() == fs::file_type::not_found) return GuestEnoent;
+    if (sourceNeedsDirectory && !fs::is_directory(sourceStatus)) return GuestEnotdir;
 
     const auto parent = destination.parent_path().empty() ? fs::path(".") : destination.parent_path();
     error.clear();
@@ -30,6 +41,7 @@ int RenamePath_nid_no_patch(const std::filesystem::path& source, const std::file
     if (error && error != std::errc::no_such_file_or_directory) return FilesystemError(error);
     const bool destinationExists = destinationStatus.type() != fs::file_type::not_found;
     const bool sourceIsDirectory = fs::is_directory(sourceStatus);
+    if (destinationNeedsDirectory && !sourceIsDirectory) return GuestEnotdir;
     const bool destinationIsDirectory = destinationExists && fs::is_directory(destinationStatus);
     bool sameFile = false;
     if (destinationExists) {
@@ -57,8 +69,23 @@ int RenamePath_nid_no_patch(const std::filesystem::path& source, const std::file
     }
 #ifdef _WIN32
     if (!sameFile && sourceIsDirectory && destinationIsDirectory) {
+        auto displaced = destination;
+        displaced += ".anyps5-displaced-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
         error.clear();
-        if (!fs::remove(destination, error)) return error ? FilesystemError(error) : GuestEio;
+        fs::rename(destination, displaced, error);
+        if (error) return FilesystemError(error);
+        error.clear();
+        fs::rename(source, destination, error);
+        const int failure = error ? FilesystemError(error) : 0;
+        std::error_code cleanup;
+        if (failure) {
+            fs::rename(displaced, destination, cleanup);
+            if (cleanup) throw std::runtime_error("rename: cannot restore the displaced destination directory");
+            return failure;
+        }
+        fs::remove(displaced, cleanup);
+        if (cleanup) throw std::runtime_error("rename: cannot remove the displaced destination directory");
+        return 0;
     }
 #endif
 
