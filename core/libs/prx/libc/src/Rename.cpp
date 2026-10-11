@@ -1,10 +1,11 @@
 #include "prx/libc/include/FilesystemError.hpp"
 #include "prx/libc/include/General.hpp"
+#include "prx/libc/include/Rename.hpp"
 #include <cerrno>
 #include <filesystem>
 #include <new>
 
-static int RenamePath_nid_no_patch(const std::filesystem::path& source, const std::filesystem::path& destination) {
+int RenamePath_nid_no_patch(const std::filesystem::path& source, const std::filesystem::path& destination) {
     constexpr int GuestEnoent = 2;
     constexpr int GuestEio = 5;
     constexpr int GuestEnotdir = 20;

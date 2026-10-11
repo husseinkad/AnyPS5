@@ -5,6 +5,7 @@
 #include "SceTypes.hpp"
 #include "prx/libc/include/General.hpp"
 #include "prx/libc/include/GuestArena.hpp"
+#include "prx/libc/include/Rename.hpp"
 #include "prx/libkernel/File/include/File.hpp"
 #include "prx/libkernel/File/include/FileFlags.hpp"
 #include "prx/libkernel/File/include/NativeStat.hpp"
@@ -1002,11 +1003,8 @@ int APS5_VABI sceKernelRename(const char* from, const char* to) {
     if (from == nullptr || to == nullptr) throw std::invalid_argument("sceKernelRename: path is null");
     if (*from == '\0' || *to == '\0') return SceErrorFromErrno(GUEST_ENOENT);
     const auto source = ResolvePath_nid_no_patch(from);
-    std::error_code error;
-    if (!std::filesystem::exists(source, error)) return SceErrorFromErrno(GUEST_ENOENT);
     const auto destination = ResolvePath_nid_no_patch(to);
-    std::filesystem::rename(source, destination, error);
-    if (error) return SceErrorFromErrno(GUEST_EIO);
+    if (const int error = RenamePath_nid_no_patch(source, destination)) return SceKernelError(error);
     RecordWrittenPath_nid_no_patch(source);
     RecordWrittenPath_nid_no_patch(destination);
     return 0;
