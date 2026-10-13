@@ -465,6 +465,29 @@ static void CheckIpv6SocketsAreIpv6Only() {
     Require(sceNetSocketClose(inet) == 0);
 }
 
+static void CheckListenWithoutBind(int family) {
+    const auto addressSize = family == 2 ? 16u : 28u;
+    const int listener = sceNetSocket(nullptr, family, 1, 6);
+    Require(listener >= 0);
+    Require(sceNetListen(listener, 1) == 0);
+    std::array<std::uint8_t, 28> address{};
+    std::uint32_t size = address.size();
+    Require(sceNetGetsockname(listener, address.data(), &size) == 0 && size == addressSize);
+    Require(address[1] == family && (address[2] != 0 || address[3] != 0));
+    const auto hostBytes = family == 2 ? 4u : 16u;
+    const auto hostOffset = family == 2 ? 4u : 8u;
+    Require(std::all_of(address.begin() + hostOffset, address.begin() + hostOffset + hostBytes, [](auto byte) { return byte == 0; }));
+    if (family == 2) { address[4] = 127; address[7] = 1; }
+    else address[23] = 1;
+    const int client = sceNetSocket(nullptr, family, 1, 6);
+    Require(client >= 0 && sceNetConnect(client, address.data(), addressSize) == 0);
+    const int accepted = sceNetAccept(listener, nullptr, nullptr);
+    Require(accepted >= 0);
+    char byte = 0;
+    Require(sceNetSend(client, "x", 1, 0) == 1 && sceNetRecv(accepted, &byte, 1, 0) == 1 && byte == 'x');
+    for (const int descriptor : {client, accepted, listener}) Require(sceNetSocketClose(descriptor) == 0);
+}
+
 int main() {
     const auto epoch = std::chrono::steady_clock::time_point{};
     Require(KernelSocketSelect::DeadlineAfter(epoch, 2, 250000) == epoch + std::chrono::milliseconds(2250));
@@ -488,6 +511,8 @@ int main() {
     CheckUnspecifiedIpv6();
     if (!ipv6Unavailable) CheckIpv6SocketsAreIpv6Only();
 
+    CheckListenWithoutBind(2);
+    if (!ipv6Unavailable) CheckListenWithoutBind(28);
     const int closed = sceNetSocket("closed-by-kernel", 2, 2, 17);
     Require(closed >= 0);
     const int enabled = 1;
