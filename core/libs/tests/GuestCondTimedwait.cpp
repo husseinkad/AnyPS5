@@ -17,6 +17,8 @@ int APS5_VABI scePthreadCondDestroy(PthreadCond* cond);
 int APS5_VABI scePthreadCondTimedwait(PthreadCond* cond, PthreadMutex* mutex, unsigned int usec);
 int APS5_VABI scePthreadCondSignal(PthreadCond* cond);
 int APS5_VABI pthread_cond_reltimedwait_np_nid_postfix(PthreadCond* cond, PthreadMutex* mutex, unsigned int usec);
+int APS5_VABI pthread_cond_timedwait_nid_postfix(PthreadCond* cond, PthreadMutex* mutex, const KernelTimespec* abstime);
+int APS5_VABI clock_gettime_nid_postfix(int clockId, KernelTimespec* tp);
 int APS5_VABI __cxa_atexit_nid_postfix(void (APS5_VABI *)(void*), void*, void*);
 void APS5_VABI __pthread_cxa_finalize_nid_postfix(void*);
 unsigned int APS5_VABI sceKernelSleep(unsigned int seconds);
@@ -29,6 +31,7 @@ static constexpr int SCE_OK = 0;
 static constexpr int SCE_KERNEL_ERROR_ETIMEDOUT = static_cast<int>(0x8002003C);
 static constexpr int SCE_KERNEL_ERROR_EBUSY = static_cast<int>(0x80020010);
 static constexpr int POSIX_EPERM = 1;
+static constexpr int POSIX_EINVAL = 22;
 static constexpr int POSIX_ETIMEDOUT = 60;
 
 static void Require(bool value) { if (!value) std::abort(); }
@@ -104,8 +107,37 @@ static void RelativeWait() {
     Require(scePthreadMutexDestroy(&signalled.mutex) == SCE_OK);
 }
 
+static void AbsoluteWait() {
+    Signalled signalled;
+    Require(scePthreadMutexInit(&signalled.mutex, nullptr, nullptr) == SCE_OK);
+    Require(scePthreadCondInit(&signalled.cond, nullptr, nullptr) == SCE_OK);
+    Require(scePthreadMutexLock(&signalled.mutex) == SCE_OK);
+
+    KernelTimespec now{};
+    Require(clock_gettime_nid_postfix(0, &now) == 0);
+    const KernelTimespec invalid[] = {{-1, 0}, {-1000, 500}, {now.tv_sec + 1, -1}, {now.tv_sec + 1, 1000000000}};
+    Require(pthread_cond_timedwait_nid_postfix(&signalled.cond, &signalled.mutex, nullptr) == POSIX_EINVAL);
+    for (const auto& deadline : invalid) {
+        Require(pthread_cond_timedwait_nid_postfix(&signalled.cond, &signalled.mutex, &deadline) == POSIX_EINVAL);
+        RequireHeldByCaller(signalled);
+    }
+
+    const KernelTimespec past{now.tv_sec - 1, now.tv_nsec};
+    Require(pthread_cond_timedwait_nid_postfix(&signalled.cond, &signalled.mutex, &past) == POSIX_ETIMEDOUT);
+    RequireHeldByCaller(signalled);
+
+    const KernelTimespec epoch{0, 0};
+    Require(pthread_cond_timedwait_nid_postfix(&signalled.cond, &signalled.mutex, &epoch) == POSIX_ETIMEDOUT);
+    RequireHeldByCaller(signalled);
+
+    Require(scePthreadMutexUnlock(&signalled.mutex) == SCE_OK);
+    Require(scePthreadCondDestroy(&signalled.cond) == SCE_OK);
+    Require(scePthreadMutexDestroy(&signalled.mutex) == SCE_OK);
+}
+
 int main() {
     RelativeWait();
+    AbsoluteWait();
 
     Context context;
     PthreadCond cond = nullptr;
