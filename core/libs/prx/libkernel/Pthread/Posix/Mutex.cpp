@@ -5,9 +5,11 @@
 #include "../include/Pthread.hpp"
 #include "../include/Mutex.hpp"
 #include "Common.hpp"
+#include "prx/libkernel/Time/include/TimedWait.hpp"
 #include <atomic>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 namespace {
 
@@ -63,8 +65,14 @@ int APS5_VABI pthread_mutex_timedlock_nid_postfix(PthreadMutex* mutex, const Ker
     if (!abstime) throw std::runtime_error("pthread_mutex_timedlock: null abstime");
     _initializeStatic(mutex, __func__);
     if (scePthreadMutexTrylock(mutex) == 0) return 0;
+    const bool heldByCaller = (*mutex)->_owner.load(std::memory_order_acquire) == std::this_thread::get_id();
+    if (heldByCaller && abstime->tv_sec < 0) return POSIX_EINVAL;
     KernelUseconds usec = 0;
     if (!PosixThread::RelativeMicroseconds(GUEST_REALTIME_CLOCK, abstime, &usec)) return POSIX_EINVAL;
+    if (heldByCaller) {
+        TimedWait::SleepUntil(TimedWait::DeadlineNanos(usec));
+        return PosixThread::GUEST_ETIMEDOUT;
+    }
     return PosixThread::ToErrno(scePthreadMutexTimedlock(mutex, usec));
 }
 
