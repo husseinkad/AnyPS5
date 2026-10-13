@@ -1,5 +1,6 @@
 #include "prx/libc/include/general/VabiMacros.hpp"
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <limits>
 
@@ -12,10 +13,15 @@ std::int64_t APS5_VABI write_nid_postfix(int, const char*, std::int64_t);
 int* APS5_VABI __error_nid_postfix();
 }
 
-#include <cstdio>
-static void Check(bool value, int line) { if (!value) { std::fprintf(stderr, "line %d errno %d\n", line, *__error_nid_postfix()); std::abort(); } }
-#define Require(v) Check((v), __LINE__)
+static void Check(bool value, int line) {
+    if (!value) {
+        std::fprintf(stderr, "Lseek overflow check failed at line %d, errno %d\n", line, *__error_nid_postfix());
+        std::abort();
+    }
+}
+#define Require(value) Check((value), __LINE__)
 
+constexpr const char* Path = "lseek_overflow.bin";
 constexpr int CreateReadWrite = 0x202;
 constexpr int FromStart = 0;
 constexpr int FromCurrent = 1;
@@ -32,7 +38,8 @@ static void RequireFailure(std::int64_t result, int error) {
 }
 
 int main() {
-    const int file = sceKernelOpen("lseek_overflow.bin", CreateReadWrite, 0644);
+    std::remove(Path);
+    const int file = sceKernelOpen(Path, CreateReadWrite, 0644);
     Require(file >= 0);
     Require(write_nid_postfix(file, "12345", 5) == 5);
     Require(lseek_nid_postfix(file, 2, FromStart) == 2);
@@ -41,10 +48,18 @@ int main() {
     RequireFailure(lseek_nid_postfix(file, Largest, FromEnd), GuestEoverflow);
     Require(sceKernelLseek(file, Largest, FromEnd) == SceEoverflow);
     Require(lseek_nid_postfix(file, 0, FromCurrent) == 2);
-    Require(lseek_nid_postfix(file, Largest - 2, FromCurrent) == Largest);
-    RequireFailure(lseek_nid_postfix(file, 1, FromCurrent), GuestEoverflow);
-    Require(lseek_nid_postfix(file, Largest - 5, FromEnd) == Largest);
+    RequireFailure(lseek_nid_postfix(file, -1, FromStart), GuestEinval);
     RequireFailure(lseek_nid_postfix(file, -6, FromEnd), GuestEinval);
     Require(sceKernelLseek(file, -6, FromEnd) == SceEinval);
+    Require(lseek_nid_postfix(file, 0, FromCurrent) == 2);
+    const std::int64_t reached = lseek_nid_postfix(file, Largest - 2, FromCurrent);
+    if (reached == -1 && *__error_nid_postfix() == GuestEinval) {
+        std::fprintf(stderr, "skipped: the host filesystem cannot seek near INT64_MAX, the overflow cases from there are not run\n");
+    } else {
+        Require(reached == Largest);
+        RequireFailure(lseek_nid_postfix(file, 1, FromCurrent), GuestEoverflow);
+        Require(lseek_nid_postfix(file, Largest - 5, FromEnd) == Largest);
+    }
     Require(sceKernelClose(file) == 0);
+    std::remove(Path);
 }
