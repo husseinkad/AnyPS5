@@ -116,6 +116,20 @@ static void CheckReleaseFlexibleMemory() {
     Require(sceKernelMunmap(again, length) == 0);
 }
 
+static void CheckPosixMunmapReleasesFlexibleMemory() {
+    constexpr std::size_t length = 0x10000;
+    std::size_t before = 0;
+    std::size_t available = 0;
+    Require(sceKernelAvailableFlexibleMemorySize(&before) == 0);
+    void* mapped = nullptr;
+    Require(sceKernelMapFlexibleMemory(&mapped, length, 3, 0) == 0 && mapped != nullptr);
+    Require(sceKernelAvailableFlexibleMemorySize(&available) == 0 && available == before - length);
+    Require(munmap_nid_postfix(static_cast<unsigned char*>(mapped) + length / 2, length / 2) == 0);
+    Require(sceKernelAvailableFlexibleMemorySize(&available) == 0 && available == before - length / 2);
+    Require(munmap_nid_postfix(mapped, length / 2) == 0);
+    Require(sceKernelAvailableFlexibleMemorySize(&available) == 0 && available == before);
+}
+
 static void CheckFlexibleMappingIgnoresFlag8000() {
     constexpr std::size_t length = 0x10000;
     std::size_t before = 0;
@@ -2137,6 +2151,7 @@ int main() {
     CheckVirtualQuerySplitFlexibleRanges();
     CheckVirtualQueryForNonReadableGuestRange();
     CheckReleaseFlexibleMemory();
+    CheckPosixMunmapReleasesFlexibleMemory();
     CheckFlexibleMappingIgnoresFlag8000();
     CheckSceKernelMmap();
     CheckInternalMemoryAvailableSize();

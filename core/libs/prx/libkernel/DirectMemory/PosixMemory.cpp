@@ -16,6 +16,7 @@
 extern "C" int* APS5_VABI __error_nid_postfix();
 extern "C" int APS5_VABI sceKernelMlock_nid_postfix(void* address, std::uint64_t length);
 extern "C" int APS5_VABI sceKernelMunlock_nid_postfix(void* address, std::uint64_t length);
+extern "C" int APS5_VABI sceKernelMunmap(std::uint64_t address, std::size_t length);
 extern "C" int APS5_VABI sceKernelVirtualQuery(const void* addr, int flags, VirtualQueryInfo* info, uint64_t info_size);
 
 namespace {
@@ -163,7 +164,7 @@ int APS5_VABI munmap_nid_postfix(void* address, std::size_t length) noexcept {
         rounded > std::numeric_limits<std::uintptr_t>::max() - start)
         return failed(GuestInvalid);
     try {
-        if (DoMunmap(address, rounded) != 0) return failed(GuestInvalid);
+        if (sceKernelMunmap(start, rounded) != 0) return failed(GuestInvalid);
         return 0;
     } catch (const std::bad_alloc&) {
         return failed(GuestNoMemory);
