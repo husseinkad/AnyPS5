@@ -623,6 +623,9 @@ int main() {
     FileStream invalidMode(std::tmpfile());
     Require(freopen_nid_postfix(filename.c_str(), "zz", &invalidMode) == nullptr && *__error_nid_postfix() == 22);
     Require(invalidMode.GuestState().flags == 0 && invalidMode.GuestState().descriptor == -1);
+    FileStream closedInvalidMode(std::tmpfile());
+    closedInvalidMode.Close();
+    Require(freopen_nid_postfix(filename.c_str(), "zz", &closedInvalidMode) == nullptr && *__error_nid_postfix() == 22);
     FileStream invalidModeWithoutPath(std::tmpfile());
     Require(freopen_nid_postfix(nullptr, "zz", &invalidModeWithoutPath) == nullptr && *__error_nid_postfix() == 22);
     Require(invalidModeWithoutPath.GuestState().flags == 0 && invalidModeWithoutPath.GuestState().descriptor == -1);
