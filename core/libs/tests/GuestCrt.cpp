@@ -1,6 +1,7 @@
 #include "SceTypes.hpp"
 #include "prx/libc/include/general/VabiMacros.hpp"
 #include "prx/libc/include/SonyCrt.hpp"
+#include <algorithm>
 #include <cfenv>
 #include <climits>
 #include <cerrno>
@@ -12,6 +13,7 @@
 #include <cstring>
 #include <ctime>
 #include <exception>
+#include <iterator>
 #include <limits>
 
 extern "C" {
@@ -20,6 +22,8 @@ double APS5_VABI sceAmprSinh(double x, double y);
 char* APS5_VABI sceAmprStrtokS(char* str, const char* delim, char** context);
 int APS5_VABI sceAmprCtimeS(char* buffer, std::size_t size, const std::int64_t* time);
 int APS5_VABI sceAmprWcscpyS(std::uint16_t* dest, std::size_t size, const std::uint16_t* src);
+int APS5_VABI wcscpy_s_nid_postfix(std::uint16_t* dest, std::size_t size, const std::uint16_t* src);
+void* APS5_VABI set_constraint_handler_s_nid_postfix(void* handler);
 void* APS5_VABI sceAmprSetConstraintHandlerS(void* handler);
 int APS5_VABI sceAmprFltrounds(void);
 void APS5_VABI sceAmprIgnoreHandlerS(const char* message, void* pointer, int error);
@@ -145,6 +149,20 @@ int main() {
     Require(sceAmprWcscpyS(buffer, 4, longText) == ERANGE);
     Require(g_handlerCalls == 1);
     Require(sceAmprWcscpyS(nullptr, 4, longText) == EINVAL);
+    std::uint16_t filled[8];
+    std::fill(std::begin(filled), std::end(filled), static_cast<std::uint16_t>(0x7777));
+    Require(sceAmprWcscpyS(filled, 4, longText) == ERANGE && filled[0] == 0);
+    std::fill(std::begin(filled), std::end(filled), static_cast<std::uint16_t>(0x7777));
+    void* libcPrevious = set_constraint_handler_s_nid_postfix(reinterpret_cast<void*>(&CountingHandler));
+    Require(wcscpy_s_nid_postfix(filled, 4, longText) == ERANGE && filled[0] == 0);
+    set_constraint_handler_s_nid_postfix(libcPrevious);
+    std::fill(std::begin(filled), std::end(filled), static_cast<std::uint16_t>(0x7777));
+    Require(sceAmprWcscpyS(filled, 4, nullptr) == EINVAL && filled[0] == 0);
+    std::fill(std::begin(filled), std::end(filled), static_cast<std::uint16_t>(0x7777));
+    Require(sceAmprWcscpyS(filled, 0, hello) == EINVAL && filled[0] == 0x7777);
+    std::fill(std::begin(filled), std::end(filled), static_cast<std::uint16_t>(0x7777));
+    const std::uint16_t exact[] = {'a', 'b', 'c', 0};
+    Require(sceAmprWcscpyS(filled, 4, exact) == 0 && filled[2] == 'c' && filled[3] == 0 && filled[4] == 0x7777);
     previous = sceAmprSetConstraintHandlerS(nullptr);
     Require(previous == reinterpret_cast<void*>(&CountingHandler));
     previous = sceAmprSetConstraintHandlerS(reinterpret_cast<void*>(&CountingHandler));

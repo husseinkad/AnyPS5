@@ -107,6 +107,7 @@ inline void* SonySetConstraintHandlerS(void* handler) {
 
 inline int SonyWcscpyS(std::uint16_t* dest, std::size_t size, const std::uint16_t* src) {
     if (!dest || !src || size == 0) {
+        if (dest && size != 0) dest[0] = 0;
         SonyInvokeConstraintHandler("wcscpy_s", dest, EINVAL);
         return EINVAL;
     }
@@ -115,11 +116,12 @@ inline int SonyWcscpyS(std::uint16_t* dest, std::size_t size, const std::uint16_
         dest[i] = src[i];
         ++i;
     }
-    dest[i] = 0;
     if (src[i] != 0) {
+        dest[0] = 0;
         SonyInvokeConstraintHandler("wcscpy_s", dest, ERANGE);
         return ERANGE;
     }
+    dest[i] = 0;
     return 0;
 }
 
