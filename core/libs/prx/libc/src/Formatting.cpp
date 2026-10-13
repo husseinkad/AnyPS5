@@ -243,7 +243,7 @@ int APS5_VABI vfprintf_nid_postfix(FileStream* stream, const char* format, VaLis
 #ifdef _WIN32
     std::string buffer;
     const int count = LibcDetail::FormatWindows(nullptr, 0, format, args, &buffer);
-    const int result = std::fwrite(buffer.data(), 1, static_cast<size_t>(count), native) ==
+    const int result = stream->Write(buffer.data(), static_cast<size_t>(count)) ==
         static_cast<size_t>(count) ? count : -1;
 #else
     if (HasGuestWideFormat(format)) {
@@ -541,7 +541,9 @@ int APS5_VABI printf_s_nid_postfix(const char* format, ...) {
 #endif
 
 int APS5_VABI puts_nid_postfix(const char* s) {
-    return std::puts(s);
+    const int result = std::puts(s);
+    if (result >= 0 && _Stdout_nid_postfix.IsLineBuffered() && std::fflush(stdout) != 0) return EOF;
+    return result;
 }
 
 }

@@ -50,6 +50,7 @@ class FileStream {
     std::FILE* _handle;
     bool _dynamic;
     bool guestError = false;
+    bool lineBuffered = false;
 
 public:
     explicit FileStream(std::FILE* handle, bool dynamic = false) : _handle(handle), _dynamic(dynamic) {
@@ -69,6 +70,31 @@ public:
     std::FILE* GetHandle() const {
         if (!_handle) throw std::runtime_error("FileStream: closed stream");
         return _handle;
+    }
+
+    bool IsLineBuffered() const {
+        return lineBuffered;
+    }
+
+    void SetLineBuffered(bool enabled) {
+        lineBuffered = enabled;
+    }
+
+    std::size_t Write(const void* data, std::size_t size) {
+        auto* handle = GetHandle();
+        if (!lineBuffered) return std::fwrite(data, 1, size, handle);
+        const auto* bytes = static_cast<const unsigned char*>(data);
+        std::size_t head = size;
+        while (head > 0 && bytes[head - 1] != '\n') --head;
+        const std::size_t written = std::fwrite(bytes, 1, head, handle);
+        if (written != head) return written;
+        if (head > 0 && std::fflush(handle) != 0) return head - 1;
+        return written + std::fwrite(bytes + head, 1, size - head, handle);
+    }
+
+    int FlushAfterByte(int byte, int result) {
+        if (result != EOF && lineBuffered && static_cast<unsigned char>(byte) == '\n' && std::fflush(GetHandle()) != 0) return EOF;
+        return result;
     }
 
     bool IsDynamic() const {

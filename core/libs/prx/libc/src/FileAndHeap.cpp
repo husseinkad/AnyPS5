@@ -367,7 +367,7 @@ size_t APS5_VABI fwrite_nid_postfix(const void* buffer, size_t size, size_t coun
     auto* handle = GetNativeStream(stream);
     if (size == 0 || count == 0) return 0;
     if (!buffer) throw std::runtime_error("fwrite: null buffer");
-    const auto result = std::fwrite(buffer, size, count, handle);
+    const auto result = stream->IsLineBuffered() ? stream->Write(buffer, size * count) / size : std::fwrite(buffer, size, count, handle);
     stream->SyncStatus();
     return result;
 }
@@ -428,7 +428,9 @@ void APS5_VABI rewind_nid_postfix(FileStream* stream) {
 
 int APS5_VABI fputs_nid_postfix(const char* str, FileStream* stream) {
     if (!str) throw std::runtime_error("fputs: null string");
-    const int result = std::fputs(str, GetNativeStream(stream));
+    auto* native = GetNativeStream(stream);
+    const std::size_t length = stream->IsLineBuffered() ? std::strlen(str) : 0;
+    const int result = stream->IsLineBuffered() ? (stream->Write(str, length) == length ? 0 : EOF) : std::fputs(str, native);
     stream->SyncStatus();
     return result;
 }

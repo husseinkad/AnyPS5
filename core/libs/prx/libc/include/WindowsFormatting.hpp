@@ -398,10 +398,12 @@ inline int FormatWindows(char* buffer, size_t size, const char* format, const vo
     return output.Count();
 }
 
+std::size_t WriteGuestStandardOutput(const char* data, std::size_t size);
+
 inline int PrintWindows(const char* format, const void* args) {
     std::string buffer;
     const int size = FormatWindows(nullptr, 0, format, args, &buffer);
-    if (std::fwrite(buffer.data(), 1, static_cast<size_t>(size), stdout) != static_cast<size_t>(size))
+    if (WriteGuestStandardOutput(buffer.data(), static_cast<size_t>(size)) != static_cast<size_t>(size))
         throw std::runtime_error("Formatted output write failed");
     return size;
 }

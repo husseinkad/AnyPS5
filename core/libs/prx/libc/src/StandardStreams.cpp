@@ -47,16 +47,16 @@ int APS5_VABI getc_unlocked_nid_postfix(FileStream* stream) {
 int APS5_VABI __srget_nid_postfix(FileStream* stream) { return fgetc_nid_postfix(stream); }
 int APS5_VABI getchar_nid_postfix() { return fgetc_nid_postfix(__stdinp_nid_postfix); }
 int APS5_VABI fputc_nid_postfix(int value, FileStream* stream) {
-    const int result = std::fputc(value, GetNativeStream(stream));
+    const int result = stream->FlushAfterByte(value, std::fputc(value, GetNativeStream(stream)));
     stream->SyncStatus();
     return result;
 }
 int APS5_VABI putc_nid_postfix(int value, FileStream* stream) { return fputc_nid_postfix(value, stream); }
 int APS5_VABI putc_unlocked_nid_postfix(int value, FileStream* stream) {
 #ifdef _WIN32
-    const int result = _fputc_nolock(value, GetNativeStream(stream));
+    const int result = stream->FlushAfterByte(value, _fputc_nolock(value, GetNativeStream(stream)));
 #else
-    const int result = ::putc_unlocked(value, GetNativeStream(stream));
+    const int result = stream->FlushAfterByte(value, ::putc_unlocked(value, GetNativeStream(stream)));
 #endif
     stream->SyncUnlockedStatus();
     return result;
@@ -101,17 +101,27 @@ int APS5_VABI fileno_nid_postfix(FileStream* stream) {
 int APS5_VABI setvbuf_nid_postfix(FileStream* stream, char* buffer, int mode, std::size_t size) {
     if (mode < 0 || mode > 2) return -1;
 #ifdef _WIN32
-    const int native = mode == 0 ? _IOFBF : _IONBF;
+    const int native = mode == 2 ? _IONBF : _IOFBF;
+    const bool lineBuffered = mode == 1;
 #else
     const int native = mode == 0 ? _IOFBF : mode == 1 ? _IOLBF : _IONBF;
+    const bool lineBuffered = false;
 #endif
-    if (native != _IONBF && size == 0) {
+    if (native != _IONBF && (size == 0 || (lineBuffered && size == 1))) {
         buffer = nullptr;
         size = BUFSIZ;
     }
-    return std::setvbuf(GetNativeStream(stream), buffer, native, size);
+    const int result = std::setvbuf(GetNativeStream(stream), buffer, native, size);
+    if (result == 0) stream->SetLineBuffered(lineBuffered);
+    return result;
 }
 void APS5_VABI setbuf_nid_postfix(FileStream* stream, char* buffer) {
     setvbuf_nid_postfix(stream, buffer, buffer ? 0 : 2, buffer ? 1024 : 0);
+}
+}
+
+namespace LibcDetail {
+std::size_t WriteGuestStandardOutput(const char* data, std::size_t size) {
+    return _Stdout_nid_postfix.Write(data, size);
 }
 }

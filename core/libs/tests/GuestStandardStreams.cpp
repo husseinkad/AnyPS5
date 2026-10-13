@@ -242,16 +242,25 @@ static std::string ReadHostFile(const std::string& filename) {
 static void CheckLineBuffering() {
     const auto filename = "anyps5-line-buffer-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
     FileStream* stream = fopen_nid_postfix(filename.c_str(), "w");
-    Require(stream != nullptr && setvbuf_nid_postfix(stream, nullptr, 1, 0) == 0);
-    Require(fputc_nid_postfix('x', stream) == 'x' && fputc_nid_postfix('\n', stream) == '\n');
+    Require(stream != nullptr && setvbuf_nid_postfix(stream, nullptr, 1, 1) == 0);
+    Require(stream->IsLineBuffered());
+    Require(fputc_nid_postfix('x', stream) == 'x' && ReadHostFile(filename).empty());
+    Require(fputc_nid_postfix('\n', stream) == '\n');
     Require(ReadHostFile(filename) == "x\n");
-    Require(fputs_nid_postfix("ab\n", stream) >= 0);
+    Require(fputs_nid_postfix("ab\ncd", stream) >= 0);
     Require(ReadHostFile(filename) == "x\nab\n");
-    Require(setvbuf_nid_postfix(stream, nullptr, 0, 0) == 0);
-    Require(fputs_nid_postfix("cd\n", stream) >= 0);
-    Require(ReadHostFile(filename) == "x\nab\n");
+    Require(fwrite_nid_postfix("ef\ngh", 1, 5, stream) == 5);
+    Require(ReadHostFile(filename) == "x\nab\ncdef\n");
+    Require(fprintf_nid_postfix(stream, "%s\nij", "ghh") == 6);
+    Require(ReadHostFile(filename) == "x\nab\ncdef\nghghh\n");
+    Require(fwrite_nid_postfix("mn", 1, 2, stream) == 2);
+    Require(fflush_nid_postfix(stream) == 0 && ReadHostFile(filename) == "x\nab\ncdef\nghghh\nijmn");
+    Require(setvbuf_nid_postfix(stream, nullptr, 0, 0) == 0 && !stream->IsLineBuffered());
+    Require(fputs_nid_postfix("kl\n", stream) >= 0);
+    Require(ReadHostFile(filename) == "x\nab\ncdef\nghghh\nijmn");
+    Require(setvbuf_nid_postfix(stream, nullptr, 3, 0) == -1 && !stream->IsLineBuffered());
     Require(fclose_nid_postfix(stream) == 0);
-    Require(ReadHostFile(filename) == "x\nab\ncd\n");
+    Require(ReadHostFile(filename) == "x\nab\ncdef\nghghh\nijmnkl\n");
     Require(std::filesystem::remove(filename));
 }
 
