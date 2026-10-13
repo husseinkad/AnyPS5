@@ -320,6 +320,8 @@ int APS5_VABI sceHttpUriSweepPath(char* dst, const char* src, size_t srcSize) {
     if (!dst || !src) return ERROR_INVALID_VALUE;
 
     const size_t length = srcSize - 1;
+    const std::string input(src, length);
+    src = input.data();
     if (length == 0 || src[0] != '/') {
         std::memcpy(dst, src, length);
         dst[length] = '\0';

@@ -381,6 +381,12 @@ int main() {
     Require(sceHttpUriSweepPath(sweptPath, "/ab/c", 3) == 0 && Equal(sweptPath, "/a"));
     Require(sceHttpUriSweepPath(sweptPath, "/a/./b", 5) == 0 && Equal(sweptPath, "/a/."));
     Require(sceHttpUriSweepPath(sweptPath, "/a/b/../c", 8) == 0 && Equal(sweptPath, "/a/b/.."));
+    char inPlace[32];
+    constexpr const char* inPlaceCases[][2] = {{"/a/b/../c", "/a/c"}, {"/foo/./bar/", "/foo/bar/"}, {"/a/../b/", "/b/"}, {"a/b", "a/b"}, {"/", "/"}};
+    for (const auto& row : inPlaceCases) {
+        std::strcpy(inPlace, row[0]);
+        Require(sceHttpUriSweepPath(inPlace, inPlace, std::strlen(row[0]) + 1) == 0 && Equal(inPlace, row[1]));
+    }
     char sweptByte[2] = {'x', 'x'};
     Require(sceHttpUriSweepPath(sweptByte, "/", 1) == 0 && sweptByte[0] == '\0' && sweptByte[1] == 'x');
 }
