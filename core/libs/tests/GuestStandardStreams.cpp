@@ -37,6 +37,7 @@ int APS5_VABI vfprintf_nid_postfix(FileStream*, const char*, void*);
 int APS5_VABI vsprintf_nid_postfix(char*, const char*, void*);
 int APS5_VABI fgetc_nid_postfix(FileStream*);
 int APS5_VABI fputc_nid_postfix(int, FileStream*);
+int APS5_VABI fputs_nid_postfix(const char*, FileStream*);
 int APS5_VABI getc_unlocked_nid_postfix(FileStream*);
 int APS5_VABI putc_unlocked_nid_postfix(int, FileStream*);
 int APS5_VABI fputwc_nid_postfix(char16_t, FileStream*);
@@ -291,6 +292,27 @@ static void CheckRewind() {
     rewind_nid_postfix(&pipe);
     Require(*__error_nid_postfix() == 29 && feof_nid_postfix(&pipe) == 0 && ferror_nid_postfix(&pipe) == 0);
     pipe.Close();
+}
+
+static std::string ReadHostFile(const std::string& filename) {
+    std::ifstream input(filename, std::ios::binary);
+    return std::string((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+}
+
+static void CheckLineBuffering() {
+    const auto filename = "anyps5-line-buffer-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    FileStream* stream = fopen_nid_postfix(filename.c_str(), "w");
+    Require(stream != nullptr && setvbuf_nid_postfix(stream, nullptr, 1, 0) == 0);
+    Require(fputc_nid_postfix('x', stream) == 'x' && fputc_nid_postfix('\n', stream) == '\n');
+    Require(ReadHostFile(filename) == "x\n");
+    Require(fputs_nid_postfix("ab\n", stream) >= 0);
+    Require(ReadHostFile(filename) == "x\nab\n");
+    Require(setvbuf_nid_postfix(stream, nullptr, 0, 0) == 0);
+    Require(fputs_nid_postfix("cd\n", stream) >= 0);
+    Require(ReadHostFile(filename) == "x\nab\n");
+    Require(fclose_nid_postfix(stream) == 0);
+    Require(ReadHostFile(filename) == "x\nab\ncd\n");
+    Require(std::filesystem::remove(filename));
 }
 
 static void CheckFlushWhileReading() {
@@ -640,6 +662,7 @@ int main() {
     locked.Close();
     CheckRewind();
     CheckFgetsSize();
+    CheckLineBuffering();
     CheckUnlockedStreams();
     CheckUnlockedStreamLock(false);
     CheckUnlockedStreamLock(true);
