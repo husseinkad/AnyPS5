@@ -45,11 +45,14 @@ unsigned int APS5_VABI _ZSt14_Random_devicev_nid_postfix();
 #define Require(condition) do { if (!(condition)) { std::fprintf(stderr, "guest_crt: line %d: %s\n", __LINE__, #condition); std::abort(); } } while (0)
 
 static int g_handlerCalls = 0;
+static const std::uint16_t* g_watched = nullptr;
+static int g_watchedValue = -1;
 static void CountingHandler(const char* message, void* pointer, int error) {
     (void)message;
     (void)pointer;
     (void)error;
     ++g_handlerCalls;
+    if (g_watched) g_watchedValue = *g_watched;
 }
 
 int main() {
@@ -158,6 +161,14 @@ int main() {
     set_constraint_handler_s_nid_postfix(libcPrevious);
     std::fill(std::begin(filled), std::end(filled), static_cast<std::uint16_t>(0x7777));
     Require(sceAmprWcscpyS(filled, 4, nullptr) == EINVAL && filled[0] == 0);
+    std::fill(std::begin(filled), std::end(filled), static_cast<std::uint16_t>(0x7777));
+    g_watched = filled;
+    g_watchedValue = -1;
+    Require(sceAmprWcscpyS(filled, 4, longText) == ERANGE && g_watchedValue == 0);
+    g_watched = nullptr;
+    std::uint16_t selfCopy[] = {'a', 'b', 'c', 'd', 'e', 0};
+    g_handlerCalls = 0;
+    Require(sceAmprWcscpyS(selfCopy, 4, selfCopy) == ERANGE && selfCopy[0] == 0 && g_handlerCalls == 1);
     std::fill(std::begin(filled), std::end(filled), static_cast<std::uint16_t>(0x7777));
     Require(sceAmprWcscpyS(filled, 0, hello) == EINVAL && filled[0] == 0x7777);
     std::fill(std::begin(filled), std::end(filled), static_cast<std::uint16_t>(0x7777));
