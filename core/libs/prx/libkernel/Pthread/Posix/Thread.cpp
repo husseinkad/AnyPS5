@@ -153,6 +153,7 @@ int APS5_VABI pthread_getschedparam_nid_postfix(Pthread thread, int* policy, Ker
 
 int APS5_VABI pthread_getaffinity_np_nid_postfix(Pthread thread, std::size_t cpusetSize, void* cpuset) {
     if (!thread) return PosixThread::GUEST_EINVAL;
+    if (!GuestThreadIsSelfOrLive(thread)) return PosixThread::GUEST_ESRCH;
     if (cpusetSize != GUEST_CPUSET_BYTES) return GUEST_ERANGE;
     if (!cpuset) return PosixThread::GUEST_EFAULT;
     KernelCpumask mask = 0;
@@ -214,6 +215,7 @@ int APS5_VABI pthread_equal_nid_postfix(Pthread first, Pthread second) {
 int APS5_VABI pthread_getcpuclockid_nid_postfix(Pthread thread, int* clockId) {
     constexpr int guestFault = 14;
     if (!thread) return PosixThread::GUEST_EINVAL;
+    if (!GuestThreadIsSelfOrLive(thread)) return PosixThread::GUEST_ESRCH;
     if (!clockId) return guestFault;
     *clockId = GuestThreadCpuClockId(thread);
     return 0;

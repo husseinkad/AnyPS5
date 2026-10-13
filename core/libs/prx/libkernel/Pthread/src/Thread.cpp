@@ -372,6 +372,12 @@ bool GuestThreadIsLive(const PthreadPrivate* thread) {
     return false;
 }
 
+extern "C" Pthread APS5_VABI scePthreadSelf();
+
+bool GuestThreadIsSelfOrLive(const PthreadPrivate* thread) {
+    return thread == scePthreadSelf() || GuestThreadIsLive(thread);
+}
+
 bool LiveGuestThreadExists(std::int64_t tid) {
     auto& registry = CpuClocks();
     std::lock_guard lock(registry.lock);

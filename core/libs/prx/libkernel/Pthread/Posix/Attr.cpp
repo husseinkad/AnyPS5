@@ -28,6 +28,7 @@ int APS5_VABI pthread_attr_destroy_nid_postfix(PthreadAttr* attr) {
 
 int APS5_VABI pthread_attr_get_np_nid_postfix(Pthread thread, PthreadAttr* attr) {
     if (!thread || !Valid(attr)) return PosixThread::GUEST_EINVAL;
+    if (!GuestThreadIsSelfOrLive(thread)) return PosixThread::GUEST_ESRCH;
     auto* p = *attr;
     p->_stacksize = thread->stackSize;
     p->stackAddress = thread->stackAddress;
