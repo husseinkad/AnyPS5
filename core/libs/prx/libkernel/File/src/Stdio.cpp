@@ -849,8 +849,10 @@ int APS5_VABI sceKernelGetdirentries(int fd, char* buf, int nbytes, int64_t* bas
     if (GuestSockets::IsOpen(fd)) return SceErrorFromErrno(GUEST_EINVAL);
     if (buf == nullptr) return SceErrorFromErrno(GUEST_EFAULT);
     if (nbytes <= 0) return SceErrorFromErrno(GUEST_EINVAL);
-    if (basep != nullptr) *basep = 0;
-    return File::ReadDirectoryDescriptor(fd, buf, nbytes);
+    const auto start = File::SeekDirectoryDescriptor(fd, 0, SEEK_CUR);
+    const int result = File::ReadDirectoryDescriptor(fd, buf, nbytes);
+    if (result >= 0 && basep != nullptr) *basep = start.value_or(0);
+    return result;
 }
 
 int APS5_VABI sceKernelGetdents(int fd, char* buf, int nbytes) {
@@ -867,7 +869,6 @@ int APS5_VABI sceKernelGetdirentries(int fd, char* buf, int nbytes, int64_t* bas
     if (nbytes <= 0) return SceErrorFromErrno(GUEST_EINVAL);
     const off_t base = ::lseek(fd, 0, SEEK_CUR);
     if (base < 0) return SceErrorFromErrno(errno);
-    if (basep != nullptr) *basep = static_cast<int64_t>(base);
     std::vector<char> host(static_cast<std::size_t>(nbytes) < 4096 ? 4096 : static_cast<std::size_t>(nbytes));
     const auto read = ::syscall(SYS_getdents64, fd, host.data(), host.size());
     if (read < 0) return SceErrorFromErrno(errno);
@@ -879,7 +880,10 @@ int APS5_VABI sceKernelGetdirentries(int fd, char* buf, int nbytes, int64_t* bas
         const auto record = (GuestHeaderBytes + nameLength + 1 + 3) & ~std::size_t{3};
         if (nameLength > GuestMaxName || written + record > static_cast<std::size_t>(nbytes)) {
             if (::lseek(fd, resume, SEEK_SET) < 0) return SceErrorFromErrno(errno);
-            if (written != 0) return static_cast<int>(written);
+            if (written != 0) {
+                if (basep != nullptr) *basep = static_cast<int64_t>(base);
+                return static_cast<int>(written);
+            }
             return nameLength > GuestMaxName ? static_cast<int>(0x80020000u | GUEST_ENAMETOOLONG) : SceErrorFromErrno(GUEST_EINVAL);
         }
         char* out = buf + written;
@@ -897,6 +901,7 @@ int APS5_VABI sceKernelGetdirentries(int fd, char* buf, int nbytes, int64_t* bas
         offset += entry->d_reclen;
     }
     if (::lseek(fd, resume, SEEK_SET) < 0) return SceErrorFromErrno(errno);
+    if (basep != nullptr) *basep = static_cast<int64_t>(base);
     return static_cast<int>(written);
 }
 

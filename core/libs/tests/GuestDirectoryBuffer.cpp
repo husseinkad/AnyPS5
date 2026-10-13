@@ -16,6 +16,7 @@ extern "C" {
 int APS5_VABI sceKernelOpen(const char*, int, std::uint16_t);
 int APS5_VABI sceKernelClose(int);
 int APS5_VABI sceKernelGetdents(int, char*, int);
+std::int64_t APS5_VABI sceKernelLseek(int, std::int64_t, int);
 int APS5_VABI sceKernelGetdirentries(int, char*, int, std::int64_t*);
 int APS5_VABI getdents_nid_postfix(int, char*, int);
 int APS5_VABI getdirentries_nid_postfix(int, char*, int, std::int64_t*);
@@ -104,7 +105,39 @@ static void CheckOversizedName() {
     std::filesystem::remove_all(root);
 }
 
+static void CheckBase() {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("anyps5-directory-base-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    Require(std::filesystem::create_directory(root));
+    { std::ofstream file(root / "first"); Require(static_cast<bool>(file)); }
+    { std::ofstream file(root / "second"); Require(static_cast<bool>(file)); }
+    const int directory = sceKernelOpen(root.string().c_str(), SCE_KERNEL_O_RDONLY | SCE_KERNEL_O_DIRECTORY, 0);
+    Require(directory >= 0);
+    std::array<char, 512> buffer;
+    std::int64_t base = -1;
+    Require(sceKernelGetdirentries(directory, buffer.data(), 8, &base) == SCE_KERNEL_ERROR_EINVAL);
+    Require(base == -1);
+    Require(sceKernelGetdirentries(directory, buffer.data(), 12, &base) == 12);
+    Require(base == 0 && std::strcmp(buffer.data() + 8, ".") == 0);
+    Require(getdirentries_nid_postfix(directory, buffer.data(), 12, &base) == 12);
+    Require(base == 1 && std::strcmp(buffer.data() + 8, "..") == 0);
+    Require(sceKernelGetdirentries(directory, buffer.data(), static_cast<int>(buffer.size()), &base) > 0);
+    Require(base == 2);
+    base = -1;
+    Require(sceKernelGetdirentries(directory, buffer.data(), static_cast<int>(buffer.size()), &base) == 0);
+    Require(base == 4);
+    Require(sceKernelLseek(directory, 1, 0) == 1);
+    Require(sceKernelGetdirentries(directory, buffer.data(), 12, &base) == 12);
+    Require(base == 1 && std::strcmp(buffer.data() + 8, "..") == 0);
+    base = -1;
+    Require(sceKernelGetdirentries(-1, buffer.data(), static_cast<int>(buffer.size()), &base) < 0);
+    Require(base == -1);
+    Require(sceKernelClose(directory) == 0);
+    std::filesystem::remove_all(root);
+}
+
 int main() {
+    CheckBase();
     CheckName(u8"a-long-directory-entry-name.bin");
     CheckName(u8"caf\u00e9-music.bin");
     CheckName(u8"\u30bb\u30fc\u30d6-music.bin");
