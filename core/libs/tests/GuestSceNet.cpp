@@ -488,6 +488,21 @@ static void CheckListenWithoutBind(int family) {
     for (const int descriptor : {client, accepted, listener}) Require(sceNetSocketClose(descriptor) == 0);
 }
 
+static void CheckListenAfterRefusedConnect() {
+    const int closing = sceNetSocket(nullptr, 2, 1, 6);
+    Require(closing >= 0);
+    std::array<std::uint8_t, 16> refused{16, 2, 0, 0, 127, 0, 0, 1};
+    Require(sceNetBind_nid_postfix(closing, refused.data(), refused.size()) == 0);
+    std::uint32_t size = refused.size();
+    Require(sceNetGetsockname(closing, refused.data(), &size) == 0);
+    Require(sceNetSocketClose(closing) == 0);
+    const int socket = sceNetSocket(nullptr, 2, 1, 6);
+    Require(socket >= 0);
+    Require(Failed(sceNetConnect(socket, refused.data(), refused.size()), 61));
+    Require(sceNetListen(socket, 5) == 0);
+    Require(sceNetSocketClose(socket) == 0);
+}
+
 int main() {
     const auto epoch = std::chrono::steady_clock::time_point{};
     Require(KernelSocketSelect::DeadlineAfter(epoch, 2, 250000) == epoch + std::chrono::milliseconds(2250));
@@ -513,6 +528,7 @@ int main() {
 
     CheckListenWithoutBind(2);
     if (!ipv6Unavailable) CheckListenWithoutBind(28);
+    CheckListenAfterRefusedConnect();
     const int closed = sceNetSocket("closed-by-kernel", 2, 2, 17);
     Require(closed >= 0);
     const int enabled = 1;

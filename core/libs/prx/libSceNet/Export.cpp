@@ -451,6 +451,15 @@ std::int64_t message_length(const NetMsghdr* message) {
     return static_cast<std::int64_t>(total);
 }
 
+bool has_local_port(NativeSocket native) {
+    sockaddr_storage local{};
+    NativeLength local_length = sizeof(local);
+    if (::getsockname(native, reinterpret_cast<sockaddr*>(&local), &local_length) != 0) return false;
+    if (local.ss_family == AF_INET) return reinterpret_cast<const sockaddr_in&>(local).sin_port != 0;
+    if (local.ss_family == AF_INET6) return reinterpret_cast<const sockaddr_in6&>(local).sin6_port != 0;
+    return false;
+}
+
 int receive_error(const Sock& socket) {
 #ifdef _WIN32
     if (WSAGetLastError() == WSAETIMEDOUT && socket.type != NET_SOCK_STREAM && socket.rcv_timeout_us > 0) return NET_EAGAIN;
@@ -701,7 +710,7 @@ int APS5_VABI sceNetListen(int s, int backlog) {
         socket = it->second;
     }
     if (socket.type != NET_SOCK_STREAM) return fail(NET_EOPNOTSUPP);
-    if (!socket.bound) {
+    if (!socket.bound && !has_local_port(socket.native->value)) {
         sockaddr_storage wildcard{};
         NativeLength wildcard_length = 0;
         if (socket.family == NET_AF_INET) {
