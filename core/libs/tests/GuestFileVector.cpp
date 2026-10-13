@@ -195,6 +195,14 @@ int main() {
     Require(sceKernelWritev(file, writes, 2) == ErrorEbadf);
     Require(sceKernelPreadv(file, reads, 2, 0) == ErrorEbadf);
     Require(sceKernelPwritev(file, writes, 2, 0) == ErrorEbadf);
+    Require(sceKernelPreadv(file, reads, 2, -1) == ErrorEbadf);
+    Require(sceKernelPwritev(file, writes, 2, -1) == ErrorEbadf);
+    Require(preadv_nid_postfix(file, reads, 2, -1) == -1 && *__error_nid_postfix() == 9);
+    int unseekable[2] = {};
+    Require(MakePipe(unseekable) == 0);
+    Require(sceKernelPreadv(unseekable[0], reads, 2, -1) == ErrorEspipe);
+    Require(sceKernelPwritev(unseekable[1], writes, 2, -1) == ErrorEspipe);
+    Require(ClosePipe(unseekable[0]) == 0 && ClosePipe(unseekable[1]) == 0);
     Require(sceKernelPread(file, &byte, 1, 0) == ErrorEbadf);
     Require(sceKernelPwrite(file, &byte, 1, 0) == ErrorEbadf);
     Require(sceKernelFtruncate(file, 0) == ErrorEbadf);
