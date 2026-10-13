@@ -93,6 +93,9 @@ constexpr std::uint32_t NonblockingRequest = 0x8004667e;
 constexpr std::uint32_t ReadableRequest = 0x4004667f;
 constexpr std::uint32_t RequestIn = 0x80000000u;
 constexpr std::uint32_t TerminalGroup = 't';
+constexpr std::uint32_t GetProcessGroup = 0x40047477;
+constexpr std::uint32_t SetProcessGroup = 0x80047476;
+constexpr int StandardStreams = 3;
 
 struct GuestLock {
     std::int64_t start;
@@ -546,6 +549,7 @@ int Ioctl(int fd, std::uint64_t request, void* argument) {
         std::memcpy(argument, &available, sizeof(available));
         return 0;
     }
+    if (*kind == Kind::Pipe && fd >= StandardStreams && (command == GetProcessGroup || command == SetProcessGroup)) Unsupported("ioctl", command == GetProcessGroup ? "TIOCGPGRP" : "TIOCSPGRP", *kind, fd);
     if (((command >> 8) & 0xff) == TerminalGroup) return Fail(GuestEnotty);
     char hex[11];
     std::snprintf(hex, sizeof(hex), "0x%08X", command);

@@ -63,6 +63,8 @@ static constexpr std::uint64_t NonblockingRequest = 0x8004667e;
 static constexpr std::uint64_t ReadableRequest = 0x4004667f;
 static constexpr std::uint64_t WindowSizeRequest = 0x40087468;
 static constexpr std::uint64_t AsyncRequest = 0x8004667d;
+static constexpr std::uint64_t GetProcessGroupRequest = 0x40047477;
+static constexpr std::uint64_t SetProcessGroupRequest = 0x80047476;
 static constexpr int SceEbadf = static_cast<int>(0x80020009u);
 static constexpr int SceEinval = static_cast<int>(0x80020016u);
 static constexpr int SceEnotsup = static_cast<int>(0x8002002du);
@@ -149,6 +151,8 @@ static void FileFlagsRoundTrip() {
     Require(ioctl_nid_postfix(file, ReadableRequest, &readable) == 0 && readable == 3);
     char size[8] = {};
     RequireFailure(ioctl_nid_postfix(file, WindowSizeRequest, size), GuestEnotty);
+    RequireFailure(ioctl_nid_postfix(file, GetProcessGroupRequest, size), GuestEnotty);
+    RequireFailure(ioctl_nid_postfix(file, SetProcessGroupRequest, size), GuestEnotty);
     RequireFailure(ioctl_nid_postfix(file, NonblockingRequest, nullptr), GuestEfault);
     Require(ThrowsWith([file] { int on = 1; ioctl_nid_postfix(file, AsyncRequest, &on); }, "ioctl: request 0x8004667D on a file is not implemented"));
 
@@ -358,6 +362,10 @@ static void PipeFlagsRoundTrip() {
     RequireFailure(fcntl_nid_postfix(pipe[1], SetLock, &lock), GuestEbadf);
     char size[8] = {};
     RequireFailure(ioctl_nid_postfix(pipe[0], WindowSizeRequest, size), GuestEnotty);
+    for (const int end : pipe) {
+        Require(ThrowsWith([end] { int group = 0; ioctl_nid_postfix(end, GetProcessGroupRequest, &group); }, "ioctl: TIOCGPGRP on a pipe is not implemented"));
+        Require(ThrowsWith([end] { int group = 0; ioctl_nid_postfix(end, SetProcessGroupRequest, &group); }, "ioctl: TIOCSPGRP on a pipe is not implemented"));
+    }
     Require(ThrowsWith([&pipe] { fcntl_nid_postfix(pipe[0], SetFlags, NonBlocking | 0x40); }, "fcntl: O_ASYNC on a pipe is not implemented"));
     for (const int descriptor : pipe) Require(close_nid_postfix(descriptor) == 0);
 }
