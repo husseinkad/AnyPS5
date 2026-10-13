@@ -262,6 +262,25 @@ static void CheckLineBuffering() {
     Require(fclose_nid_postfix(stream) == 0);
     Require(ReadHostFile(filename) == "x\nab\ncdef\nghghh\nijmnkl\n");
     Require(std::filesystem::remove(filename));
+    stream = fopen_nid_postfix(filename.c_str(), "w");
+    Require(stream != nullptr && setvbuf_nid_postfix(stream, nullptr, 1, 0) == 0);
+    Require(freopen_nid_postfix(filename.c_str(), "w", stream) == stream && !stream->IsLineBuffered());
+    Require(fputs_nid_postfix("k\nl", stream) >= 0 && ReadHostFile(filename).empty());
+    Require(fclose_nid_postfix(stream) == 0);
+    Require(std::filesystem::remove(filename));
+    stream = fopen_nid_postfix(filename.c_str(), "w");
+    Require(stream != nullptr && setvbuf_nid_postfix(stream, nullptr, 1, 0) == 0);
+    constexpr int units = 20000;
+    std::thread first([&] { for (int index = 0; index < units; ++index) Require(fputs_nid_postfix("AAAA\nAAAA", stream) >= 0); });
+    std::thread second([&] { for (int index = 0; index < units; ++index) Require(fputs_nid_postfix("BBBB\nBBBB", stream) >= 0); });
+    first.join();
+    second.join();
+    Require(fclose_nid_postfix(stream) == 0);
+    const std::string written = ReadHostFile(filename);
+    Require(written.size() == 9u * 2 * units);
+    for (std::size_t offset = 0; offset < written.size(); offset += 9)
+        Require(written.compare(offset, 9, written[offset] == 'A' ? "AAAA\nAAAA" : "BBBB\nBBBB") == 0);
+    Require(std::filesystem::remove(filename));
 }
 
 static void CheckFgetsSize() {

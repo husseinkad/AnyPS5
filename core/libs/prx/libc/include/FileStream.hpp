@@ -83,6 +83,21 @@ public:
     std::size_t Write(const void* data, std::size_t size) {
         auto* handle = GetHandle();
         if (!lineBuffered) return std::fwrite(data, 1, size, handle);
+#ifdef _WIN32
+        _lock_file(handle);
+#else
+        ::flockfile(handle);
+#endif
+        struct Unlock {
+            std::FILE* handle;
+            ~Unlock() {
+#ifdef _WIN32
+                _unlock_file(handle);
+#else
+                ::funlockfile(handle);
+#endif
+            }
+        } unlock{handle};
         const auto* bytes = static_cast<const unsigned char*>(data);
         std::size_t head = size;
         while (head > 0 && bytes[head - 1] != '\n') --head;
@@ -106,6 +121,7 @@ public:
         auto* previous = GetHandle();
         _guest = {};
         guestError = false;
+        lineBuffered = false;
 #ifdef _WIN32
         std::wstring wideMode;
         for (const char character : std::string_view(mode)) wideMode.push_back(static_cast<unsigned char>(character));
@@ -162,6 +178,7 @@ public:
 
     int Close() {
         GetHandle();
+        lineBuffered = false;
 #ifdef _WIN32
         GuestFileLockForget_nid_no_patch(::_fileno(_handle));
 #endif
