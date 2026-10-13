@@ -157,7 +157,9 @@ int main() {
     Require(recvfrom_nid_postfix(receiver, buffer, sizeof(buffer), 0, nullptr, nullptr) == -1);
     Require(*__error_nid_postfix() == 35);
     const char message[] = "guest UDP loopback";
-    Require(sendto_nid_postfix(sender, message, sizeof(message), 0x20000, destination.data(), destination.size()) == sizeof(message));
+    const int addressed = socket_nid_postfix(2, 2, 0);
+    Require(addressed >= 0);
+    Require(sendto_nid_postfix(addressed, message, sizeof(message), 0x20000, destination.data(), destination.size()) == sizeof(message));
     int queued = 0;
     for (int i = 0; i < 100 && queued == 0; ++i) {
         Require(ioctl_nid_postfix(receiver, 0x4004667f, &queued) == 0);
@@ -178,7 +180,7 @@ int main() {
     char tail[] = "gather";
     Iovec parts[2]{{head, 8}, {tail, 6}};
     Msghdr outgoing{destination.data(), static_cast<std::uint32_t>(destination.size()), parts, 2, nullptr, 0, 0};
-    Require(sendmsg_nid_postfix(sender, &outgoing, 0) == 14);
+    Require(sendmsg_nid_postfix(addressed, &outgoing, 0) == 14);
     const auto wait = [&] {
         queued = 0;
         for (int i = 0; i < 100 && queued == 0; ++i) {
@@ -196,7 +198,7 @@ int main() {
     Require(recvmsg_nid_postfix(receiver, &incoming, 0) == 14);
     Require(std::memcmp(first, "scat", 4) == 0 && std::memcmp(second, "ter gather", 10) == 0);
     Require(incoming.flags == 0 && incoming.controlLength == 0 && incoming.nameLength == 16 && source[1] == 2 && source[4] == 127);
-    Require(sendmsg_nid_postfix(sender, &outgoing, 0) == 14);
+    Require(sendmsg_nid_postfix(addressed, &outgoing, 0) == 14);
     wait();
     char shortBuffer[5]{};
     Iovec single{shortBuffer, sizeof(shortBuffer)};
