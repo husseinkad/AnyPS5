@@ -241,7 +241,7 @@ FileStream* APS5_VABI freopen_nid_postfix(const char* filename, const char* mode
     if (!stream || !mode) { errno = 22; return nullptr; }
     const auto parsed = ParseFileMode(mode);
     if (!parsed) {
-        if (!stream->IsClosed()) {
+        if (!stream->IsClosed() && !stream->IsStandard()) {
             stream->Close();
             if (stream->IsDynamic()) delete stream;
         }

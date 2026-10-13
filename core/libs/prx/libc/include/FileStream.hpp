@@ -71,6 +71,10 @@ public:
         return _handle;
     }
 
+    bool IsStandard() const {
+        return _handle == stdin || _handle == stdout || _handle == stderr;
+    }
+
     bool IsClosed() const {
         return _handle == nullptr;
     }

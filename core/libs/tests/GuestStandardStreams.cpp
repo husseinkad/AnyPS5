@@ -626,6 +626,21 @@ int main() {
     FileStream closedInvalidMode(std::tmpfile());
     closedInvalidMode.Close();
     Require(freopen_nid_postfix(filename.c_str(), "zz", &closedInvalidMode) == nullptr && *__error_nid_postfix() == 22);
+    for (FileStream* standard : {&_Stdout_nid_postfix, &_Stderr_nid_postfix}) {
+        Require(freopen_nid_postfix(filename.c_str(), "zz", standard) == nullptr && *__error_nid_postfix() == 22);
+        Require(standard->GetHandle() != nullptr && fflush_nid_postfix(standard) == 0 && ferror_nid_postfix(standard) == 0);
+    }
+    Require(freopen_nid_postfix(filename.c_str(), "zz", __stdinp_nid_postfix) == nullptr && *__error_nid_postfix() == 22);
+    Require(__stdinp_nid_postfix->GetHandle() == stdin);
+    {
+        std::ofstream(filename, std::ios::binary).put('x');
+        for (int index = 0; index < 10000; ++index) {
+            FileStream* opened = fopen_nid_postfix(filename.c_str(), "rb");
+            Require(opened != nullptr);
+            Require(freopen_nid_postfix(filename.c_str(), "zz", opened) == nullptr && *__error_nid_postfix() == 22);
+        }
+        Require(std::filesystem::remove(filename));
+    }
     FileStream invalidModeWithoutPath(std::tmpfile());
     Require(freopen_nid_postfix(nullptr, "zz", &invalidModeWithoutPath) == nullptr && *__error_nid_postfix() == 22);
     Require(invalidModeWithoutPath.GuestState().flags == 0 && invalidModeWithoutPath.GuestState().descriptor == -1);
