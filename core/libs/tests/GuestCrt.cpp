@@ -163,19 +163,55 @@ int main() {
     Require(asctime_s_nid_postfix(text, sizeof(text), &known) == 0);
     Require(std::strcmp(text, "Thu Jan  1 00:00:00 1970\n") == 0);
     known.tm_wday = 7;
-    Require(sceAmprAsctimeS(text, sizeof(text), &known) == EINVAL);
+    std::memset(text, 'x', sizeof(text));
+    Require(sceAmprAsctimeS(text, sizeof(text), &known) == EINVAL && text[0] == '\0');
     known.tm_wday = 4;
+    for (int GuestTm::*field : {&GuestTm::tm_sec, &GuestTm::tm_min, &GuestTm::tm_hour, &GuestTm::tm_mday, &GuestTm::tm_mon, &GuestTm::tm_wday}) {
+        for (const int value : {-1, 100}) {
+            GuestTm invalid = known;
+            invalid.*field = value;
+            std::memset(text, 'x', sizeof(text));
+            Require(sceAmprAsctimeS(text, 26, &invalid) == EINVAL && text[0] == '\0');
+            std::memset(text, 'x', sizeof(text));
+            Require(asctime_s_nid_postfix(text, 26, &invalid) == EINVAL && text[0] == '\0');
+        }
+    }
+    GuestTm zeroDay = known;
+    zeroDay.tm_mday = 0;
+    std::memset(text, 'x', sizeof(text));
+    Require(sceAmprAsctimeS(text, sizeof(text), &zeroDay) == EINVAL && text[0] == '\0');
+    GuestTm lastYear = known;
+    lastYear.tm_year = 8099;
+    Require(sceAmprAsctimeS(text, 26, &lastYear) == 0 && std::strcmp(text, "Thu Jan  1 00:00:00 9999\n") == 0);
+    lastYear.tm_year = 8100;
+    std::memset(text, 'x', sizeof(text));
+    Require(sceAmprAsctimeS(text, 26, &lastYear) == EINVAL && text[0] == '\0');
+    lastYear.tm_year = -1901;
+    std::memset(text, 'x', sizeof(text));
+    Require(sceAmprAsctimeS(text, sizeof(text), &lastYear) == EINVAL && text[0] == '\0');
+    lastYear.tm_year = -1900;
+    Require(sceAmprAsctimeS(text, 26, &lastYear) == 0 && std::strcmp(text, "Thu Jan  1 00:00:00    0\n") == 0);
+    known.tm_sec = 60;
+    Require(sceAmprAsctimeS(text, 26, &known) == 0 && std::strcmp(text, "Thu Jan  1 00:00:60 1970\n") == 0);
+    known.tm_sec = 0;
     Require(sceAmprAsctimeS(nullptr, sizeof(text), &known) == EINVAL);
-    Require(sceAmprAsctimeS(text, sizeof(text), nullptr) == EINVAL);
-    Require(sceAmprAsctimeS(text, 25, &known) == EINVAL);
+    std::memset(text, 'x', sizeof(text));
+    Require(sceAmprAsctimeS(text, sizeof(text), nullptr) == EINVAL && text[0] == '\0');
+    std::memset(text, 'x', sizeof(text));
+    Require(sceAmprAsctimeS(text, 25, &known) == EINVAL && text[0] == '\0');
     const std::int64_t epoch = 0;
     Require(sceAmprCtimeS(text, sizeof(text), &epoch) == 0);
     Require(std::strlen(text) == 25 && text[24] == '\n');
     char libcText[64];
     Require(ctime_s_nid_postfix(libcText, sizeof(libcText), &epoch) == 0);
     Require(std::strcmp(libcText, text) == 0);
-    Require(sceAmprCtimeS(text, 25, &epoch) == EINVAL);
-    Require(sceAmprCtimeS(text, sizeof(text), nullptr) == EINVAL);
+    std::memset(text, 'x', sizeof(text));
+    Require(sceAmprCtimeS(text, 25, &epoch) == EINVAL && text[0] == '\0');
+    std::memset(text, 'x', sizeof(text));
+    Require(sceAmprCtimeS(text, sizeof(text), nullptr) == EINVAL && text[0] == '\0');
+    const std::int64_t unrepresentable = INT64_MAX;
+    std::memset(text, 'x', sizeof(text));
+    Require(sceAmprCtimeS(text, sizeof(text), &unrepresentable) == EINVAL && text[0] == '\0');
 
     char line[] = "a,b,,c";
     char* context = nullptr;
