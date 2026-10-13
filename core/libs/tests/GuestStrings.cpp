@@ -33,6 +33,8 @@ int APS5_VABI memset_s_nid_postfix(void*, std::size_t, int, std::size_t);
 char* APS5_VABI strnstr_nid_postfix(const char*, const char*, std::size_t);
 std::size_t APS5_VABI strxfrm_nid_postfix(char*, const char*, std::size_t);
 int APS5_VABI snprintf_s_nid_postfix(char*, std::size_t, const char*, ...);
+int APS5_VABI sprintf_s_nid_postfix(char*, std::size_t, const char*, ...);
+int APS5_VABI vsprintf_s_nid_postfix(char*, std::size_t, const char*, void*);
 int APS5_VABI sscanf_s_nid_postfix(const char*, const char*, ...);
 int APS5_VABI __inet_aton_nid_postfix(const char*, void*);
 std::uint32_t APS5_VABI __inet_addr_nid_postfix(const char*);
@@ -104,6 +106,35 @@ static void CheckSecureCopySizeLimits() {
         const std::array<unsigned char, 8> cleared = {1, 2, 0, 0, 0, 0, 7, 8};
         Require(bytes == cleared);
     }
+}
+
+static int APS5_VABI VsprintfS(char* buffer, std::size_t size, const char* format, ...) {
+    __builtin_sysv_va_list args;
+    __builtin_sysv_va_start(args, format);
+    unsigned char list[24];
+    std::memcpy(list, args, sizeof(list));
+    const int result = vsprintf_s_nid_postfix(buffer, size, format, list);
+    __builtin_sysv_va_end(args);
+    return result;
+}
+
+static void CheckSprintfS() {
+    char buffer[8];
+    std::memset(buffer, 'x', sizeof(buffer));
+    Require(sprintf_s_nid_postfix(buffer, sizeof(buffer), "%d-%s", 42, "x") == 4 && std::strcmp(buffer, "42-x") == 0);
+    Require(sprintf_s_nid_postfix(buffer, sizeof(buffer), "%s", "1234567") == 7 && std::strcmp(buffer, "1234567") == 0);
+    Require(sprintf_s_nid_postfix(buffer, sizeof(buffer), "%s", "12345678") == -1 && buffer[0] == 0);
+    std::memset(buffer, 'x', sizeof(buffer));
+    Require(sprintf_s_nid_postfix(buffer, 0, "%s", "a") == -1 && buffer[0] == 'x');
+    Require(sprintf_s_nid_postfix(nullptr, sizeof(buffer), "%s", "a") == -1);
+    Require(sprintf_s_nid_postfix(buffer, sizeof(buffer), nullptr) == -1 && buffer[0] == 0);
+    std::memset(buffer, 'x', sizeof(buffer));
+    Require(VsprintfS(buffer, sizeof(buffer), "%d-%s", 42, "x") == 4 && std::strcmp(buffer, "42-x") == 0);
+    Require(VsprintfS(buffer, sizeof(buffer), "%s", "1234567") == 7 && std::strcmp(buffer, "1234567") == 0);
+    Require(VsprintfS(buffer, sizeof(buffer), "%s", "12345678") == -1 && buffer[0] == 0);
+    std::memset(buffer, 'x', sizeof(buffer));
+    Require(VsprintfS(buffer, 0, "%s", "a") == -1 && buffer[0] == 'x');
+    Require(VsprintfS(nullptr, sizeof(buffer), "%s", "a") == -1);
 }
 
 static void CheckBoundsCheckedFunctions() {
@@ -215,6 +246,7 @@ static bool CheckDirnameLengths() {
 int main() {
     if (!CheckDirnameLengths()) return 1;
     CheckBoundsCheckedFunctions();
+    CheckSprintfS();
     CheckCaseInsensitiveComparison();
     CheckSscanfS();
     Require(std::strcmp(dirname_nid_postfix(nullptr), ".") == 0);

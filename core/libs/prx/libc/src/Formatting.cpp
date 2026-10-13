@@ -14,6 +14,7 @@
 #include "SceTypes.hpp"
 #include "prx/libc/include/FileStream.hpp"
 #include "prx/libc/include/ApplicationHeap.hpp"
+#include "prx/libc/include/SecureFormatting.hpp"
 
 #include "prx/libc/include/WindowsFormatting.hpp"
 
@@ -506,20 +507,17 @@ int APS5_VABI vsnprintf_s_nid_postfix(char* buffer, size_t size, const char* for
 }
 
 int APS5_VABI vsprintf_s_nid_postfix(char* buffer, size_t size, const char* format, VaList* args) {
-    if (HasGuestWideFormat(format)) return LibcDetail::FormatWindows(buffer, size, format, args);
-    std::va_list copy;
-    va_copy(copy, *reinterpret_cast<std::va_list*>(args));
-    const int result = std::vsnprintf(buffer, size, format, copy);
-    va_end(copy);
-    return result;
+    if (!LibcDetail::SecureSprintfArguments(buffer, size, format)) return -1;
+    return LibcDetail::SecureSprintfResult(buffer, size, vsnprintf_s_nid_postfix(buffer, size, format, args));
 }
 
 int APS5_VABI sprintf_s_nid_postfix(char* buffer, size_t size, const char* format, ...) {
+    if (!LibcDetail::SecureSprintfArguments(buffer, size, format)) return -1;
     std::va_list args;
     va_start(args, format);
     const int result = HasGuestWideFormat(format) ? LibcDetail::FormatWindows(buffer, size, format, args) : std::vsnprintf(buffer, size, format, args);
     va_end(args);
-    return result;
+    return LibcDetail::SecureSprintfResult(buffer, size, result);
 }
 
 int APS5_VABI snprintf_s_nid_postfix(char* buffer, size_t size, const char* format, ...) {
