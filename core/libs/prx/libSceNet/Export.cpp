@@ -701,6 +701,21 @@ int APS5_VABI sceNetListen(int s, int backlog) {
         socket = it->second;
     }
     if (socket.type != NET_SOCK_STREAM) return fail(NET_EOPNOTSUPP);
+    if (!socket.bound) {
+        sockaddr_storage wildcard{};
+        NativeLength wildcard_length = 0;
+        if (socket.family == NET_AF_INET) {
+            auto& v4 = reinterpret_cast<sockaddr_in&>(wildcard);
+            v4.sin_family = AF_INET;
+            wildcard_length = sizeof(v4);
+        } else {
+            auto& v6 = reinterpret_cast<sockaddr_in6&>(wildcard);
+            v6.sin6_family = AF_INET6;
+            wildcard_length = sizeof(v6);
+        }
+        if (::bind(socket.native->value, reinterpret_cast<const sockaddr*>(&wildcard), wildcard_length) != 0)
+            return fail(native_error());
+    }
     if (::listen(socket.native->value, backlog) != 0) return fail(native_error());
     std::lock_guard lk(g_mutex);
     auto it = g_socks.find(s);
