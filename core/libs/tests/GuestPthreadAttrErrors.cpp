@@ -16,8 +16,14 @@ int APS5_VABI scePthreadAttrSetschedparam(PthreadAttr* attr, const KernelSchedPa
 int APS5_VABI scePthreadAttrGetschedparam(const PthreadAttr* attr, KernelSchedParam* param);
 int APS5_VABI scePthreadAttrSetaffinity(PthreadAttr* attr, KernelCpumask mask);
 int APS5_VABI scePthreadAttrGetaffinity(const PthreadAttr* attr, KernelCpumask* mask);
+int APS5_VABI pthread_attr_setschedpolicy_nid_postfix(PthreadAttr* attr, int policy);
+int APS5_VABI pthread_attr_getschedpolicy_nid_postfix(const PthreadAttr* attr, int* policy);
+int APS5_VABI pthread_attr_setschedparam_nid_postfix(PthreadAttr* attr, const KernelSchedParam* param);
+int APS5_VABI pthread_attr_getschedparam_nid_postfix(const PthreadAttr* attr, KernelSchedParam* param);
 }
 
+static constexpr int GUEST_EINVAL = 22;
+static constexpr int GUEST_ENOTSUP = 45;
 static constexpr int SCE_OK = 0;
 static constexpr int SCE_KERNEL_ERROR_EINVAL = static_cast<int>(0x80020016u);
 static constexpr int SCE_KERNEL_ERROR_EOPNOTSUPP = static_cast<int>(0x8002002Du);
@@ -53,6 +59,25 @@ int main() {
         KernelSchedParam read{};
         Require(scePthreadAttrGetschedparam(&attr, &read) == SCE_OK && read.sched_priority == priority);
     }
+    int policy = 0;
+    for (int rejected : {-1, 0, 2, 4}) {
+        Require(pthread_attr_setschedpolicy_nid_postfix(&attr, rejected) == GUEST_ENOTSUP);
+        Require(pthread_attr_getschedpolicy_nid_postfix(&attr, &policy) == 0 && policy == 3);
+    }
+    Require(pthread_attr_setschedpolicy_nid_postfix(&attr, 1) == 0);
+    Require(pthread_attr_getschedpolicy_nid_postfix(&attr, &policy) == 0 && policy == 1);
+    for (int priority : {-1, 0, 255, 768, 900, 960}) {
+        param.sched_priority = priority;
+        Require(pthread_attr_setschedparam_nid_postfix(&attr, &param) == GUEST_ENOTSUP);
+        KernelSchedParam read{};
+        Require(pthread_attr_getschedparam_nid_postfix(&attr, &read) == 0 && read.sched_priority == 767);
+    }
+    Require(pthread_attr_setschedparam_nid_postfix(&attr, nullptr) == GUEST_ENOTSUP);
+    param.sched_priority = 300;
+    Require(pthread_attr_setschedparam_nid_postfix(&attr, &param) == 0);
+    Require(pthread_attr_getschedparam_nid_postfix(&attr, &param) == 0 && param.sched_priority == 300);
+    Require(pthread_attr_setschedpolicy_nid_postfix(nullptr, 1) == GUEST_EINVAL);
+    Require(pthread_attr_setschedparam_nid_postfix(nullptr, &param) == GUEST_EINVAL);
     for (KernelCpumask mask : {KernelCpumask{0}, KernelCpumask{1}, ~KernelCpumask{0}})
         Require(scePthreadAttrSetaffinity(&attr, mask) == SCE_OK);
 

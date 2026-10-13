@@ -13,6 +13,8 @@ int APS5_VABI scePthreadAttrDestroy(PthreadAttr* attr);
 int APS5_VABI scePthreadAttrSetstacksize(PthreadAttr* attr, std::size_t stacksize);
 int APS5_VABI scePthreadAttrSetstack(PthreadAttr* attr, void* addr, std::size_t size);
 int APS5_VABI scePthreadAttrSetsolosched(PthreadAttr* attr, int solosched);
+int APS5_VABI scePthreadAttrSetschedparam(PthreadAttr* attr, const KernelSchedParam* param);
+int APS5_VABI scePthreadAttrSetschedpolicy(PthreadAttr* attr, int policy);
 }
 
 static bool Valid(const PthreadAttr* attr) {
@@ -120,15 +122,13 @@ int APS5_VABI pthread_attr_setinheritsched_nid_postfix(PthreadAttr* attr, int in
 }
 
 int APS5_VABI pthread_attr_setschedparam_nid_postfix(PthreadAttr* attr, const KernelSchedParam* param) {
-    if (!Valid(attr) || !param) return PosixThread::GUEST_EINVAL;
-    (*attr)->_schedpriority = param->sched_priority;
-    return 0;
+    if (!Valid(attr)) return PosixThread::GUEST_EINVAL;
+    return PosixThread::ToErrno(scePthreadAttrSetschedparam(attr, param));
 }
 
 int APS5_VABI pthread_attr_setschedpolicy_nid_postfix(PthreadAttr* attr, int policy) {
     if (!Valid(attr)) return PosixThread::GUEST_EINVAL;
-    (*attr)->_schedpolicy = policy;
-    return 0;
+    return PosixThread::ToErrno(scePthreadAttrSetschedpolicy(attr, policy));
 }
 
 int APS5_VABI pthread_attr_setscope_nid_postfix(PthreadAttr* attr, int scope) {
