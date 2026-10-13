@@ -100,7 +100,11 @@ int APS5_VABI fileno_nid_postfix(FileStream* stream) {
 }
 int APS5_VABI setvbuf_nid_postfix(FileStream* stream, char* buffer, int mode, std::size_t size) {
     if (mode < 0 || mode > 2) return -1;
+#ifdef _WIN32
+    const int native = mode == 0 ? _IOFBF : _IONBF;
+#else
     const int native = mode == 0 ? _IOFBF : mode == 1 ? _IOLBF : _IONBF;
+#endif
     if (native != _IONBF && size == 0) {
         buffer = nullptr;
         size = BUFSIZ;
