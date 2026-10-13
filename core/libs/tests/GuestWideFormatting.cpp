@@ -1,6 +1,7 @@
 #include "SceTypes.hpp"
 #include "prx/libc/include/general/VabiMacros.hpp"
 #include "prx/libc/include/GuestTime.hpp"
+#include <cmath>
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
@@ -172,6 +173,25 @@ static void CheckSwprintf() {
     Require(swprintf_nid_postfix(wide, 16, u"%q") < 0 && wide[0] == 0, "swprintf invalid conversion");
 }
 
+static void CheckNan() {
+    char16_t buffer[48];
+    const double positive = __builtin_nan("");
+    const double negative = -__builtin_nan("");
+    const long double extended = -__builtin_nanl("");
+    Require(swprintf_nid_postfix(buffer, 48, u"%f|%+f|% f|%f", positive, positive, positive, negative) == 15 &&
+        buffer == std::u16string(u"nan|nan|nan|nan"), "swprintf NaN has no sign");
+    Require(swprintf_nid_postfix(buffer, 48, u"%F|%+E|%G", negative, positive, negative) == 11 &&
+        buffer == std::u16string(u"NAN|NAN|NAN"), "swprintf upper case NaN");
+    Require(swprintf_nid_postfix(buffer, 48, u"%010.3e|%-6g|%5.1f", positive, negative, negative) == 23 &&
+        buffer == std::u16string(u"       nan|nan   |  nan"), "swprintf NaN width without zero padding");
+    Require(swprintf_nid_postfix(buffer, 48, u"%Lf|%+Lg|%+a|%A", extended, extended, positive, negative) == 15 &&
+        buffer == std::u16string(u"nan|nan|nan|NAN"), "swprintf long double and hexadecimal NaN");
+    Require(snwprintf_s_nid_postfix(buffer, 48, u"%+f|%08f", negative, negative) == 12 &&
+        buffer == std::u16string(u"nan|     nan"), "snwprintf_s NaN");
+    Require(swprintf_nid_postfix(buffer, 48, u"%+f|%010f|% f", INFINITY, -INFINITY, INFINITY) == 20 &&
+        buffer == std::u16string(u"+inf|      -inf| inf"), "swprintf infinity keeps its sign");
+}
+
 static bool WcsftimeThrows(char16_t* buffer, const char16_t* format, const GuestTm* time) {
     try {
         wcsftime_nid_postfix(buffer, 16, format, time);
@@ -244,6 +264,7 @@ int main() {
     CheckPointer();
     CheckCount();
     CheckSwprintf();
+    CheckNan();
     CheckWcsftime();
     Check(u"%.2s", "\xc3\xa9\xc3\xa8", u"\u00e9\u00e8");
     Check(u"%.1s", "\xc3\xa9\xc3\xa8", u"\u00e9");
