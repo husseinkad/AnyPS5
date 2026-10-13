@@ -828,6 +828,7 @@ int APS5_VABI connect_nid_postfix(int descriptor, const void* address, std::uint
     socklen_t size;
     if (!Address(address, length, native, size)) return -1;
     if (native.ss_family != (socket->family == 2 ? AF_INET : AF_INET6)) return Fail(47);
+    if (PortOf(native) == 0) return Fail(49);
     return ::connect(socket->value, reinterpret_cast<sockaddr*>(&native), size) ? Fail(NativeError()) : 0;
 }
 int APS5_VABI listen_nid_postfix(int descriptor, int backlog) {
@@ -971,6 +972,7 @@ std::int64_t APS5_VABI sendto_nid_postfix(int descriptor, const void* buffer, st
         socklen_t size;
         if (!Address(address, addressLength, native, size)) return -1;
         if (native.ss_family != (socket->family == 2 ? AF_INET : AF_INET6)) return Fail(47);
+        if (PortOf(native) == 0) return Fail(49);
         result = static_cast<int>(::sendto(socket->value, static_cast<const char*>(buffer), static_cast<int>(length), NativeSendFlags(flags),
             reinterpret_cast<sockaddr*>(&native), size));
     }
