@@ -278,6 +278,12 @@ std::int64_t APS5_VABI sceKernelLseek(int d, std::int64_t offset, int whence) {
         return *directory;
     }
 #endif
+    if (whence != 0 && offset > 0) {
+        constexpr int GuestEoverflow = 84;
+        FileStat status{};
+        const std::int64_t base = whence == 1 ? NativeLseek(d, 0, whence) : File::FillFileStatFromDescriptor(d, &status) ? status.st_size : -1;
+        if (base >= 0 && base > std::numeric_limits<std::int64_t>::max() - offset) return static_cast<int>(0x80020000u | GuestEoverflow);
+    }
     std::int64_t result = NativeLseek(d, offset, whence);
     if (result < 0) return SceIoErrorFromErrno(errno);
     return result;
