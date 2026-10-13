@@ -493,6 +493,22 @@ static void CheckDatagramIgnoresUnreachablePort() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     Require(sceNetRecvfrom(receiver, received, sizeof(received), 0, nullptr, nullptr) == 2 && received[0] == 'o');
     Require(sceNetSocketClose(sender) == 0 && sceNetSocketClose(receiver) == 0);
+    const int connected = sceNetSocket(nullptr, 2, 2, 17);
+    Require(connected >= 0);
+    const int timeout = 2000000;
+    Require(sceNetSetsockopt(connected, 0xffff, 0x1006, &timeout, sizeof(timeout)) == 0);
+    Require(sceNetConnect(connected, unreachable.data(), unreachable.size()) == 0);
+    Require(sceNetSend(connected, "x", 1, 0) == 1);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+#ifdef _WIN32
+    constexpr int unreachableError = 54;
+#else
+    constexpr int unreachableError = 61;
+#endif
+    const auto start = std::chrono::steady_clock::now();
+    Require(Failed(sceNetRecv(connected, received, sizeof(received), 0), unreachableError));
+    Require(std::chrono::steady_clock::now() - start < std::chrono::milliseconds(1500));
+    Require(sceNetSocketClose(connected) == 0);
 }
 
 int main() {

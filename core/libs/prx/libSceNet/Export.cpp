@@ -775,7 +775,17 @@ int APS5_VABI sceNetConnect(int s, const void* addr, uint32_t addrlen) {
     NativeLength native_length = 0;
     if (!guest_to_native_address(addr, addrlen, native, native_length)) return fail(NET_EINVAL);
     if (native.ss_family != (socket.family == NET_AF_INET ? AF_INET : AF_INET6)) return fail(NET_EAFNOSUPPORT);
-    if (::connect(socket.native->value, reinterpret_cast<const sockaddr*>(&native), native_length) == 0) return 0;
+    if (::connect(socket.native->value, reinterpret_cast<const sockaddr*>(&native), native_length) == 0) {
+#ifdef _WIN32
+        if (socket.type == NET_SOCK_DGRAM) {
+            BOOL report_unreachable = TRUE;
+            DWORD returned = 0;
+            if (WSAIoctl(socket.native->value, SIO_UDP_CONNRESET, &report_unreachable, sizeof(report_unreachable), nullptr, 0,
+                &returned, nullptr, nullptr) != 0) return fail(native_error());
+        }
+#endif
+        return 0;
+    }
 #ifdef _WIN32
     if (WSAGetLastError() == WSAEWOULDBLOCK) return fail(NET_EINPROGRESS);
 #endif
