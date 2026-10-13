@@ -223,6 +223,20 @@ bool Address(const void* input, std::uint32_t length, sockaddr_storage& native, 
 std::uint16_t& PortOf(sockaddr_storage& address) {
     return address.ss_family == AF_INET ? reinterpret_cast<sockaddr_in&>(address).sin_port : reinterpret_cast<sockaddr_in6&>(address).sin6_port;
 }
+int BindWildcardIfUnbound(const Socket& socket) {
+#ifdef _WIN32
+    sockaddr_storage name{};
+    int size = sizeof(name);
+    if (::getsockname(socket.value, reinterpret_cast<sockaddr*>(&name), &size) == 0 || WSAGetLastError() != WSAEINVAL) return 0;
+    sockaddr_storage wildcard{};
+    wildcard.ss_family = socket.family == 2 ? AF_INET : AF_INET6;
+    const int wildcardSize = socket.family == 2 ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
+    if (::bind(socket.value, reinterpret_cast<sockaddr*>(&wildcard), wildcardSize)) return NativeError();
+#else
+    static_cast<void>(socket);
+#endif
+    return 0;
+}
 int Disconnect(const Socket& socket) {
     sockaddr_storage peer{};
     socklen_t peerSize = sizeof(peer);
@@ -834,6 +848,7 @@ int APS5_VABI listen_nid_postfix(int descriptor, int backlog) {
     const auto socket = Lookup(descriptor);
     if (!socket) return -1;
     if (socket->type != 1) return Fail(45);
+    if (const int error = BindWildcardIfUnbound(*socket)) return Fail(error);
     return ::listen(socket->value, backlog) ? Fail(NativeError()) : 0;
 }
 int APS5_VABI accept_nid_postfix(int descriptor, void* address, std::uint32_t* length) {
