@@ -1009,6 +1009,7 @@ static std::int64_t TransferIovecs(int d, const KernelIovec* iov, int iovcnt, co
         for (std::size_t position = 0; position < iov[i].length;) {
             const auto chunk = std::min<std::size_t>(iov[i].length - position, std::numeric_limits<int>::max());
             const auto result = offset != nullptr ? NativePositioned_nid_no_patch(d, base + position, chunk, *offset + done, write) : NativeTransfer(d, base + position, chunk, write);
+            if (result < 0 && offset == nullptr && write && errno == EINVAL && _doserrno == ERROR_NO_DATA) errno = EPIPE;
             if (result < 0) return done != 0 ? done : SceErrorFromErrno(errno);
             done += result;
             position += static_cast<std::size_t>(result);
