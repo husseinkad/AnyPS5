@@ -465,6 +465,36 @@ static void CheckIpv6SocketsAreIpv6Only() {
     Require(sceNetSocketClose(inet) == 0);
 }
 
+static void CheckDatagramIgnoresUnreachablePort() {
+    const int closing = sceNetSocket(nullptr, 2, 2, 17);
+    Require(closing >= 0);
+    std::array<std::uint8_t, 16> unreachable{16, 2, 0, 0, 127, 0, 0, 1};
+    Require(sceNetBind_nid_postfix(closing, unreachable.data(), unreachable.size()) == 0);
+    std::uint32_t size = unreachable.size();
+    Require(sceNetGetsockname(closing, unreachable.data(), &size) == 0 && size == unreachable.size());
+    Require(sceNetSocketClose(closing) == 0);
+    const int receiver = sceNetSocket(nullptr, 2, 2, 17);
+    const int sender = sceNetSocket(nullptr, 2, 2, 17);
+    Require(receiver >= 0 && sender >= 0);
+    std::array<std::uint8_t, 16> address{16, 2, 0, 0, 127, 0, 0, 1};
+    Require(sceNetBind_nid_postfix(receiver, address.data(), address.size()) == 0);
+    size = address.size();
+    Require(sceNetGetsockname(receiver, address.data(), &size) == 0);
+    const int nonblocking = 1;
+    Require(sceNetSetsockopt(receiver, 0xffff, 0x1200, &nonblocking, sizeof(nonblocking)) == 0);
+    Require(sceNetSendto(receiver, "x", 1, 0, unreachable.data(), unreachable.size()) == 1);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    char received[4]{};
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        Require(Failed(sceNetRecvfrom(receiver, received, sizeof(received), 0, nullptr, nullptr), 35));
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    Require(sceNetSendto(sender, "ok", 2, 0, address.data(), address.size()) == 2);
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    Require(sceNetRecvfrom(receiver, received, sizeof(received), 0, nullptr, nullptr) == 2 && received[0] == 'o');
+    Require(sceNetSocketClose(sender) == 0 && sceNetSocketClose(receiver) == 0);
+}
+
 int main() {
     const auto epoch = std::chrono::steady_clock::time_point{};
     Require(KernelSocketSelect::DeadlineAfter(epoch, 2, 250000) == epoch + std::chrono::milliseconds(2250));
@@ -488,6 +518,7 @@ int main() {
     CheckUnspecifiedIpv6();
     if (!ipv6Unavailable) CheckIpv6SocketsAreIpv6Only();
 
+    CheckDatagramIgnoresUnreachablePort();
     const int closed = sceNetSocket("closed-by-kernel", 2, 2, 17);
     Require(closed >= 0);
     const int enabled = 1;
