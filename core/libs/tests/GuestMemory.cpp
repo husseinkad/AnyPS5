@@ -2262,6 +2262,11 @@ int main() {
     Require(madvise_nid_postfix(reinterpret_cast<void*>(0x7fffffffc000), 0x4000, 4) == 0);
     Require(munmap_nid_postfix(memory + 1, page) == -1 && *__error_nid_postfix() == 22);
     Require(munmap_nid_postfix(memory, 0) == -1 && *__error_nid_postfix() == 22);
+    *__error_nid_postfix() = 0;
+    Require(munmap_nid_postfix(reinterpret_cast<void*>(0x800000000000), page) == -1 && *__error_nid_postfix() == 22);
+    *__error_nid_postfix() = 0;
+    Require(munmap_nid_postfix(reinterpret_cast<void*>(0x7fffffffc000), page * 2) == -1 && *__error_nid_postfix() == 22);
+    Require(munmap_nid_postfix(reinterpret_cast<void*>(0x7fffffffc000), page) == 0);
     Require(memory[0] == 42);
     Require(munmap_nid_postfix(memory + page, 1) == 0); // round to one guest page
     Require(memory[0] == 42 && memory[page * 2] == 73);

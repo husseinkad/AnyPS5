@@ -160,7 +160,7 @@ int APS5_VABI munmap_nid_postfix(void* address, std::size_t length) noexcept {
     const auto start = reinterpret_cast<std::uintptr_t>(address);
     if (!RoundLength(length, rounded) || start == 0 ||
         (start & (PS5_PAGE_SIZE - 1)) != 0 ||
-        rounded > std::numeric_limits<std::uintptr_t>::max() - start)
+        start > GuestUserAddressEnd || rounded > GuestUserAddressEnd - start)
         return failed(GuestInvalid);
     try {
         if (DoMunmap(address, rounded) != 0) return failed(GuestInvalid);
