@@ -254,6 +254,26 @@ static void CheckFgetsSize() {
     stream.Close();
 }
 
+static void CheckFailedSeekKeepsState() {
+    FileStream stream(std::tmpfile());
+    Require(fwrite_nid_postfix("0123456789", 1, 10, &stream) == 10);
+    rewind_nid_postfix(&stream);
+    char text[16]{};
+    Require(fread_nid_postfix(text, 1, sizeof(text), &stream) == 10 && feof_nid_postfix(&stream) != 0);
+    const std::pair<std::int64_t, int> failures[] = {{-1, SEEK_SET}, {-11, SEEK_CUR}, {std::numeric_limits<std::int64_t>::min(), SEEK_SET}};
+    for (const auto& [offset, origin] : failures) {
+        *__error_nid_postfix() = 0;
+        Require(fseeko_nid_postfix(&stream, offset, origin) == -1 && *__error_nid_postfix() == 22);
+        Require(feof_nid_postfix(&stream) != 0 && ferror_nid_postfix(&stream) == 0 && ftello_nid_postfix(&stream) == 10);
+    }
+    Require(fseeko_nid_postfix(&stream, 1, SEEK_SET) == 0 && fgetc_nid_postfix(&stream) == '1');
+    Require(ungetc_nid_postfix('z', &stream) == 'z');
+    Require(fseeko_nid_postfix(&stream, -1, SEEK_SET) == -1 && fseeko_nid_postfix(&stream, -3, SEEK_CUR) == -1);
+    Require(ftello_nid_postfix(&stream) == 1 && fgetc_nid_postfix(&stream) == 'z' && fgetc_nid_postfix(&stream) == '2');
+    Require(fseeko_nid_postfix(&stream, -2, SEEK_CUR) == 0 && fgetc_nid_postfix(&stream) == '1');
+    stream.Close();
+}
+
 static void CheckRewind() {
     FileStream stream(std::tmpfile());
     Require(fwrite_nid_postfix("ab", 1, 2, &stream) == 2);
@@ -639,6 +659,7 @@ int main() {
     Require(fgetc_nid_postfix(&locked) == 'A' && fgetc_nid_postfix(&locked) == 'B');
     locked.Close();
     CheckRewind();
+    CheckFailedSeekKeepsState();
     CheckFgetsSize();
     CheckUnlockedStreams();
     CheckUnlockedStreamLock(false);

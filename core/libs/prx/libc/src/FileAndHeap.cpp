@@ -372,8 +372,17 @@ size_t APS5_VABI fwrite_nid_postfix(const void* buffer, size_t size, size_t coun
     return result;
 }
 
+std::int64_t APS5_VABI ftello_nid_postfix(FileStream* stream);
+
 int APS5_VABI fseeko_nid_postfix(FileStream* stream, std::int64_t offset, int origin) {
     if (origin != SEEK_SET && origin != SEEK_CUR && origin != SEEK_END) { errno = 22; return -1; }
+    if (origin == SEEK_SET && offset < 0) { errno = 22; return -1; }
+    if (origin == SEEK_CUR) {
+        const auto current = ftello_nid_postfix(stream);
+        if (current < 0) return -1;
+        if (offset > 0 && current > std::numeric_limits<std::int64_t>::max() - offset) { errno = 84; return -1; }
+        if (current + offset < 0) { errno = 22; return -1; }
+    }
 #ifdef _WIN32
     auto* native = GetNativeStream(stream);
     if (IsPipeStream(native)) { errno = 29; return -1; }
