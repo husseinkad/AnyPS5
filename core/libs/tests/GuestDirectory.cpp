@@ -104,6 +104,11 @@ int main() {
         Require(opendir_nid_postfix((sampleFile + suffix).c_str()) == nullptr);
         Require(*__error_nid_postfix() == 20);
     }
+    for (const char* alias : {"/sample.txt./entry", "/sample.txt./", "/sample.txt /entry", "/nul/entry", "/nul/"}) {
+        *__error_nid_postfix() = 0;
+        Require(opendir_nid_postfix((root.string() + alias).c_str()) == nullptr);
+        Require(*__error_nid_postfix() == 2);
+    }
     const std::string missingDirectory = (root / "missing").string();
     for (const char* suffix : {"/", "/entry", "/entry/deeper"}) {
         *__error_nid_postfix() = 0;

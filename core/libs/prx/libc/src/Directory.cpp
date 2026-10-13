@@ -54,14 +54,23 @@ bool ReadNative(NativeDirectory* native, std::filesystem::path& component, std::
 }
 #endif
 #ifdef _WIN32
+bool IsFileByExactName(const std::filesystem::path& candidate) {
+    std::error_code error;
+    const auto name = candidate.filename();
+    for (const auto& entry : std::filesystem::directory_iterator(candidate.parent_path(), error)) {
+        if (::_wcsicmp(entry.path().filename().c_str(), name.c_str()) != 0) continue;
+        const auto status = entry.status(error);
+        return std::filesystem::exists(status) && !std::filesystem::is_directory(status);
+    }
+    return false;
+}
 bool BlockedByFile(const std::filesystem::path& native) {
     std::error_code error;
     const auto last = native.has_filename() ? native : native.parent_path();
-    const auto status = std::filesystem::status(last, error);
-    if (std::filesystem::exists(status)) return !std::filesystem::is_directory(status);
-    for (auto prefix = last.parent_path(); prefix.has_relative_path(); prefix = prefix.parent_path()) {
-        const auto prefixStatus = std::filesystem::status(prefix, error);
-        if (std::filesystem::exists(prefixStatus)) return !std::filesystem::is_directory(prefixStatus);
+    for (auto component = last; component.has_relative_path(); component = component.parent_path()) {
+        const auto status = std::filesystem::status(component, error);
+        if (!std::filesystem::exists(status)) continue;
+        return !std::filesystem::is_directory(status) && IsFileByExactName(component);
     }
     return false;
 }
