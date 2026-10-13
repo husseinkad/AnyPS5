@@ -239,9 +239,14 @@ FileStream* APS5_VABI fdopen_nid_postfix(int descriptor, const char* mode) {
 
 FileStream* APS5_VABI freopen_nid_postfix(const char* filename, const char* mode, FileStream* stream) {
     if (!stream || !mode) { errno = 22; return nullptr; }
-    if (!filename) { errno = 45; return nullptr; } // Mode-only reopening is not supported.
     const auto parsed = ParseFileMode(mode);
-    if (!parsed) { errno = 22; return nullptr; }
+    if (!parsed) {
+        stream->Close();
+        if (stream->IsDynamic()) delete stream;
+        errno = 22;
+        return nullptr;
+    }
+    if (!filename) { errno = 45; return nullptr; } // Mode-only reopening is not supported.
     try {
         std::filesystem::path path;
         if (*filename) {

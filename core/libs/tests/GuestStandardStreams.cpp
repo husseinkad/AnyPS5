@@ -620,6 +620,12 @@ int main() {
     Require(freopen_nid_postfix(filename.c_str(), "rb", &failed) == nullptr);
     Require(*__error_nid_postfix() == 2);
     Require(failed.GuestState().flags == 0 && failed.GuestState().descriptor == -1);
+    FileStream invalidMode(std::tmpfile());
+    Require(freopen_nid_postfix(filename.c_str(), "zz", &invalidMode) == nullptr && *__error_nid_postfix() == 22);
+    Require(invalidMode.GuestState().flags == 0 && invalidMode.GuestState().descriptor == -1);
+    FileStream invalidModeWithoutPath(std::tmpfile());
+    Require(freopen_nid_postfix(nullptr, "zz", &invalidModeWithoutPath) == nullptr && *__error_nid_postfix() == 22);
+    Require(invalidModeWithoutPath.GuestState().flags == 0 && invalidModeWithoutPath.GuestState().descriptor == -1);
     FileStream locked(std::tmpfile());
     flockfile_nid_postfix(&locked);
     flockfile_nid_postfix(&locked);
