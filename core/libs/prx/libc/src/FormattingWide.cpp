@@ -1,5 +1,6 @@
 #include <cerrno>
 #include <climits>
+#include <cmath>
 #include <cstdint>
 #include <cstddef>
 #include <cstdio>
@@ -169,10 +170,16 @@ std::u16string FormatWide(const char16_t* format, VaList* source, bool secure = 
             } else value = args.Next<unsigned long long>();
             AppendNumber(out, spec + "ll" + static_cast<char>(conversion), value);
         } else if (In(conversion, "aAeEfFgG")) {
-            if (length == "L") AppendNumber(out, spec + "L" + static_cast<char>(conversion), args.Next<long double>());
-            else {
+            const char* const nan = conversion >= u'a' ? "nan" : "NAN";
+            if (length == "L") {
+                const long double value = args.Next<long double>();
+                if (std::isnan(value)) AppendNumber(out, LibcDetail::NanSpec(spec), nan);
+                else AppendNumber(out, spec + "L" + static_cast<char>(conversion), value);
+            } else {
                 if (!length.empty() && length != "l") throw std::invalid_argument("Invalid floating length");
-                AppendNumber(out, spec + static_cast<char>(conversion), args.Next<double>());
+                const double value = args.Next<double>();
+                if (std::isnan(value)) AppendNumber(out, LibcDetail::NanSpec(spec), nan);
+                else AppendNumber(out, spec + static_cast<char>(conversion), value);
             }
         } else if (conversion == u'p' && length.empty()) {
             const std::string text = LibcDetail::FormatPointer(spec, args.Next<void*>());
