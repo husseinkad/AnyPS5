@@ -98,6 +98,21 @@ int main() {
     Require(opendir_nid_postfix((root / "sample.txt").string().c_str()) == nullptr);
     Require(*__error_nid_postfix() == 20);
     Require(opendir_nid_postfix("") == nullptr && *__error_nid_postfix() == 2);
+    const std::string sampleFile = (root / "sample.txt").string();
+    for (const char* suffix : {"/", "/entry", "/entry/", "/entry/deeper"}) {
+        *__error_nid_postfix() = 0;
+        Require(opendir_nid_postfix((sampleFile + suffix).c_str()) == nullptr);
+        Require(*__error_nid_postfix() == 20);
+    }
+    const std::string missingDirectory = (root / "missing").string();
+    for (const char* suffix : {"/", "/entry", "/entry/deeper"}) {
+        *__error_nid_postfix() = 0;
+        Require(opendir_nid_postfix((missingDirectory + suffix).c_str()) == nullptr);
+        Require(*__error_nid_postfix() == 2);
+    }
+    *__error_nid_postfix() = 0;
+    Require(opendir_nid_postfix(((root / "subdirectory" / "missing").string() + "/").c_str()) == nullptr);
+    Require(*__error_nid_postfix() == 2);
     Require(closedir_nid_postfix(nullptr) == -1 && *__error_nid_postfix() == 9);
     const std::u8string folder = u8"セーブ";
     const std::u8string file = u8"été.txt";

@@ -53,6 +53,19 @@ bool ReadNative(NativeDirectory* native, std::filesystem::path& component, std::
     return true;
 }
 #endif
+#ifdef _WIN32
+bool BlockedByFile(const std::filesystem::path& native) {
+    std::error_code error;
+    const auto last = native.has_filename() ? native : native.parent_path();
+    const auto status = std::filesystem::status(last, error);
+    if (std::filesystem::exists(status)) return !std::filesystem::is_directory(status);
+    for (auto prefix = last.parent_path(); prefix.has_relative_path(); prefix = prefix.parent_path()) {
+        const auto prefixStatus = std::filesystem::status(prefix, error);
+        if (std::filesystem::exists(prefixStatus)) return !std::filesystem::is_directory(prefixStatus);
+    }
+    return false;
+}
+#endif
 struct Directory {
     NativeDirectory* native = nullptr;
     std::filesystem::path path;
@@ -110,7 +123,14 @@ void* APS5_VABI opendir_nid_postfix(const char* path) {
         auto directory = std::make_unique<Directory>();
         if (const int error = ResolvePathError_nid_no_patch(path, directory->path)) { errno = error; return nullptr; }
         directory->native = OpenNative(directory->path);
-        if (!directory->native) { errno = DirectoryError(errno); return nullptr; }
+        if (!directory->native) {
+            int error = DirectoryError(errno);
+#ifdef _WIN32
+            if (error == 2 && BlockedByFile(directory->path)) error = 20;
+#endif
+            errno = error;
+            return nullptr;
+        }
         return directory.release();
     } catch (const std::bad_alloc&) { errno = 12; return nullptr; }
       catch (const std::filesystem::filesystem_error&) { errno = 5; return nullptr; }
