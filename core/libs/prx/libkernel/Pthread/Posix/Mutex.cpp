@@ -14,6 +14,7 @@
 namespace {
 
 constexpr int POSIX_EINVAL = 22;
+constexpr int POSIX_EBUSY = 16;
 constexpr int GUEST_REALTIME_CLOCK = 0;
 constexpr int POSIX_PRIO_PROTECT = 2;
 constexpr int POSIX_SCHED_RR = 3;
@@ -64,7 +65,9 @@ int APS5_VABI pthread_mutex_lock_nid_postfix(PthreadMutex* mutex) {
 int APS5_VABI pthread_mutex_timedlock_nid_postfix(PthreadMutex* mutex, const KernelTimespec* abstime) {
     if (!abstime) throw std::runtime_error("pthread_mutex_timedlock: null abstime");
     _initializeStatic(mutex, __func__);
-    if (scePthreadMutexTrylock(mutex) == 0) return 0;
+    const int trylock = scePthreadMutexTrylock(mutex);
+    if (trylock == 0) return 0;
+    if (PosixThread::ToErrno(trylock) != POSIX_EBUSY) return PosixThread::ToErrno(trylock);
     const bool heldByCaller = (*mutex)->_owner.load(std::memory_order_acquire) == std::this_thread::get_id();
     if (heldByCaller && abstime->tv_sec < 0) return POSIX_EINVAL;
     KernelUseconds usec = 0;

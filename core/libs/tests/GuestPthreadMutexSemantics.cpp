@@ -1,6 +1,7 @@
 #include "SceTypes.hpp"
 #include <chrono>
 #include <cstdlib>
+#include <exception>
 #include <initializer_list>
 
 extern "C" {
@@ -76,7 +77,19 @@ static void CheckRecursiveTimedlock() {
     Require(pthread_mutexattr_destroy_nid_postfix(&attr) == 0);
 }
 
+static void CheckDestroyedTimedlock() {
+    PthreadMutex mutex = nullptr;
+    Require(pthread_mutex_init_nid_postfix(&mutex, nullptr) == 0);
+    Require(pthread_mutex_destroy_nid_postfix(&mutex) == 0);
+    const KernelTimespec deadline = After(0, 10000000);
+    try {
+        Require(pthread_mutex_timedlock_nid_postfix(&mutex, &deadline) == GUEST_EINVAL);
+    } catch (const std::exception&) {
+    }
+}
+
 int main() {
     for (const int type : {ERRORCHECK, NORMAL, ADAPTIVE}) CheckSelfTimedlock(type);
     CheckRecursiveTimedlock();
+    CheckDestroyedTimedlock();
 }
