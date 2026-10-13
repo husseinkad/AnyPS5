@@ -223,6 +223,13 @@ bool Address(const void* input, std::uint32_t length, sockaddr_storage& native, 
 std::uint16_t& PortOf(sockaddr_storage& address) {
     return address.ss_family == AF_INET ? reinterpret_cast<sockaddr_in&>(address).sin_port : reinterpret_cast<sockaddr_in6&>(address).sin6_port;
 }
+bool UnsetPort(const Socket& socket, const void* address, std::uint32_t length) {
+    if (!address || (socket.family != 2 && socket.family != 28)) return false;
+    const auto* bytes = static_cast<const unsigned char*>(address);
+    if (length < (socket.family == 2 ? 16u : 28u) || bytes[1] != socket.family || (bytes[2] | bytes[3]) != 0) return false;
+    Fail(49);
+    return true;
+}
 int Disconnect(const Socket& socket) {
     sockaddr_storage peer{};
     socklen_t peerSize = sizeof(peer);
@@ -824,6 +831,7 @@ int APS5_VABI connect_nid_postfix(int descriptor, const void* address, std::uint
     if (socket->family != GuestUnix && socket->type == 2 && address && length >= 2 && static_cast<const unsigned char*>(address)[1] == 0
         && Disconnect(*socket) != 0)
         return -1;
+    if (UnsetPort(*socket, address, length)) return -1;
     sockaddr_storage native{};
     socklen_t size;
     if (!Address(address, length, native, size)) return -1;
@@ -967,6 +975,7 @@ std::int64_t APS5_VABI sendto_nid_postfix(int descriptor, const void* buffer, st
         if (addressLength != 0) return Fail(22);
         result = ::send(socket->value, static_cast<const char*>(buffer), static_cast<int>(length), NativeSendFlags(flags));
     } else {
+        if (UnsetPort(*socket, address, addressLength)) return -1;
         sockaddr_storage native{};
         socklen_t size;
         if (!Address(address, addressLength, native, size)) return -1;
