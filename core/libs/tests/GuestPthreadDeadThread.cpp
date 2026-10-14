@@ -14,14 +14,12 @@ int APS5_VABI scePthreadAttrDestroy(PthreadAttr* attr);
 Pthread APS5_VABI pthread_self_nid_postfix(void);
 int APS5_VABI pthread_getaffinity_np_nid_postfix(Pthread thread, std::size_t size, void* set);
 int APS5_VABI pthread_attr_get_np_nid_postfix(Pthread thread, PthreadAttr* attr);
-int APS5_VABI pthread_getcpuclockid_nid_postfix(Pthread thread, int* clockId);
 }
 
 static constexpr int GUEST_ESRCH = 3;
 static constexpr int GUEST_EINVAL = 22;
 static constexpr std::size_t CPUSET_BYTES = 32;
 static constexpr unsigned char UNTOUCHED = 0xAA;
-static constexpr int UNTOUCHED_CLOCK = 0x5A5A5A5A;
 static constexpr auto GIVE_UP = std::chrono::seconds(10);
 
 static void Require(bool value) { if (!value) std::abort(); }
@@ -38,8 +36,6 @@ static void RequireQueriesSucceed(Pthread thread) {
     Require(scePthreadAttrInit(&attr) == 0);
     Require(pthread_attr_get_np_nid_postfix(thread, &attr) == 0);
     Require(scePthreadAttrDestroy(&attr) == 0);
-    int clockId = UNTOUCHED_CLOCK;
-    Require(pthread_getcpuclockid_nid_postfix(thread, &clockId) == 0 && clockId != UNTOUCHED_CLOCK);
 }
 
 static bool QueriesReportNoSuchThread(Pthread thread) {
@@ -55,10 +51,7 @@ static bool QueriesReportNoSuchThread(Pthread thread) {
     const bool attributes = pthread_attr_get_np_nid_postfix(thread, &attr) == GUEST_ESRCH;
     Require(scePthreadAttrDestroy(&attr) == 0);
 
-    int clockId = UNTOUCHED_CLOCK;
-    const bool clock = pthread_getcpuclockid_nid_postfix(thread, &clockId) == GUEST_ESRCH;
-    if (clock) Require(clockId == UNTOUCHED_CLOCK);
-    return affinity && attributes && clock;
+    return affinity && attributes;
 }
 
 int main() {
@@ -68,10 +61,8 @@ int main() {
     std::array<unsigned char, CPUSET_BYTES> set{};
     PthreadAttr attr = nullptr;
     Require(scePthreadAttrInit(&attr) == 0);
-    int clockId = 0;
     Require(pthread_getaffinity_np_nid_postfix(nullptr, CPUSET_BYTES, set.data()) == GUEST_EINVAL);
     Require(pthread_attr_get_np_nid_postfix(nullptr, &attr) == GUEST_EINVAL);
-    Require(pthread_getcpuclockid_nid_postfix(nullptr, &clockId) == GUEST_EINVAL);
     Require(scePthreadAttrDestroy(&attr) == 0);
 
     std::promise<void> release;

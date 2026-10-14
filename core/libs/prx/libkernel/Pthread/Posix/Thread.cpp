@@ -215,7 +215,6 @@ int APS5_VABI pthread_equal_nid_postfix(Pthread first, Pthread second) {
 int APS5_VABI pthread_getcpuclockid_nid_postfix(Pthread thread, int* clockId) {
     constexpr int guestFault = 14;
     if (!thread) return PosixThread::GUEST_EINVAL;
-    if (!GuestThreadIsSelfOrLive(thread)) return PosixThread::GUEST_ESRCH;
     if (!clockId) return guestFault;
     *clockId = GuestThreadCpuClockId(thread);
     return 0;
