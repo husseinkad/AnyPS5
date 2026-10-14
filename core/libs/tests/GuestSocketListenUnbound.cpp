@@ -24,6 +24,7 @@ constexpr int Inet6 = 28;
 constexpr int Stream = 1;
 constexpr int Datagram = 2;
 constexpr int ErrorNotSupported = 45;
+constexpr int ErrorRefused = 61;
 
 void Require(bool condition, const char* what) {
     if (condition) return;
@@ -94,6 +95,31 @@ void ListenWithoutBindIpv6() {
     Require(close_nid_postfix(listener) == 0, "close failed");
 }
 
+void ListenAfterRefusedConnect(int family) {
+    const std::uint32_t size = family == Inet ? 16 : 28;
+    const int probe = socket_nid_postfix(family, Stream, 0);
+    if (probe < 0) return;
+    std::array<std::uint8_t, 28> closed{};
+    closed[0] = static_cast<std::uint8_t>(size);
+    closed[1] = static_cast<std::uint8_t>(family);
+    if (family == Inet) {
+        closed[4] = 127;
+        closed[7] = 1;
+    } else {
+        closed[23] = 1;
+    }
+    const bool available = bind_nid_postfix(probe, closed.data(), size) == 0;
+    if (available) closed = Name(probe, size);
+    Require(close_nid_postfix(probe) == 0, "close failed");
+    if (!available) return;
+    const int stream = socket_nid_postfix(family, Stream, 0);
+    Require(stream >= 0, "socket failed");
+    *__error_nid_postfix() = 0;
+    Require(connect_nid_postfix(stream, closed.data(), size) == -1 && *__error_nid_postfix() == ErrorRefused, "connect to a closed loopback port must fail with ECONNREFUSED (61)");
+    Require(listen_nid_postfix(stream, 4) == 0, "listen after a refused connect must succeed");
+    Require(close_nid_postfix(stream) == 0, "close failed");
+}
+
 }
 
 int main() {
@@ -101,5 +127,7 @@ int main() {
     ListenKeepsBoundAddress();
     DatagramListenStaysUnbound();
     ListenWithoutBindIpv6();
+    ListenAfterRefusedConnect(Inet);
+    ListenAfterRefusedConnect(Inet6);
     return 0;
 }
